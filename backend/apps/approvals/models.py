@@ -17,7 +17,17 @@ class ApprovalQueue(TimeStampedModel):
 
     requested_by = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
 
-    is_approved = models.BooleanField(default=False)
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("approved", "Approved"),
+        ("rejected", "Rejected"),
+    ]
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="pending"
+    )
 
     reviewed_by = models.ForeignKey(
         CustomUser,

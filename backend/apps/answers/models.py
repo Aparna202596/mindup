@@ -11,7 +11,11 @@ class Answer(TimeStampedModel):
 
     created_by = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
 
-    is_approved = models.BooleanField(default=True)  # auto publish
+    is_approved = models.BooleanField(default=True)  
+
+    upvotes = models.PositiveIntegerField(default=0)
+
+    views = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return self.content[:50]

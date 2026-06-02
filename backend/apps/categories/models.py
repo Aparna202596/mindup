@@ -13,7 +13,17 @@ class Category(TimeStampedModel):
 
     created_by = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
 
-    is_approved = models.BooleanField(default=False)
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("approved", "Approved"),
+        ("rejected", "Rejected"),
+    ]
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="pending"
+    )
 
     class Meta:
         unique_together = ("topic", "name")
@@ -31,7 +41,17 @@ class SubCategory(TimeStampedModel):
 
     created_by = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
 
-    is_approved = models.BooleanField(default=False)
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("approved", "Approved"),
+        ("rejected", "Rejected"),
+    ]
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="pending"
+    )
 
     class Meta:
         unique_together = ("category", "name")
