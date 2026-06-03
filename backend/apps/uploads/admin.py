@@ -1,3 +1,10 @@
 from django.contrib import admin
+from apps.uploads.models import PDFUpload
+@admin.register(PDFUpload)
+class PDFUploadAdmin(admin.ModelAdmin):
 
-# Register your models here.
+    list_display = (
+        "uploaded_by",
+        "process_status",
+        "created_at"
+    )

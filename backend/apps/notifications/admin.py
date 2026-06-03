@@ -1,3 +1,10 @@
 from django.contrib import admin
+from apps.notifications.models import Notification
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
 
-# Register your models here.
+    list_display = (
+        "user",
+        "title",
+        "is_read"
+    )

@@ -1,3 +1,11 @@
 from django.contrib import admin
+from apps.core.models import AuditLog
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
 
-# Register your models here.
+    list_display = (
+        "user",
+        "action",
+        "object_type",
+        "created_at"
+    )
