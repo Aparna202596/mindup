@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard — MindUp{% endblock %}
+{% block content %}
+<h1 class="page-title">Admin Dashboard</h1>
+
+<div class="stats-grid mb-3">
+  <div class="stat-card"><div class="stat-number">{{ stats.users }}</div><div class="stat-label">Users</div></div>
+  <div class="stat-card"><div class="stat-number">{{ stats.topics }}</div><div class="stat-label">Topics</div></div>
+  <div class="stat-card"><div class="stat-number">{{ stats.categories }}</div><div class="stat-label">Categories</div></div>
+  <div class="stat-card"><div class="stat-number">{{ stats.subcategories }}</div><div class="stat-label">Subcategories</div></div>
+  <div class="stat-card"><div class="stat-number">{{ stats.questions }}</div><div class="stat-label">Questions</div></div>
+  <div class="stat-card"><div class="stat-number">{{ stats.answers }}</div><div class="stat-label">Answers</div></div>
+  <div class="stat-card"><div class="stat-number">{{ stats.answer_points }}</div><div class="stat-label">Answer Points</div></div>
+  <div class="stat-card"><div class="stat-number">{{ stats.pending_approvals }}</div><div class="stat-label">Pending</div></div>
+</div>
+
+<h2 class="section-title">Approval Queue</h2>
+{% if pending %}
+<div class="card">
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>Type</th><th>Requested by</th><th>Date</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for item in pending %}
+        <tr>
+          <td><span class="badge badge-pending">{{ item.object_type|title }}</span></td>
+          <td>{{ item.requested_by.email }}</td>
+          <td>{{ item.created_at|date:"M d, Y H:i" }}</td>
+          <td>
+            <form method="post" action="{% url 'approve-item' item.pk %}" style="display:inline;">
+              {% csrf_token %}
+              <button name="action" value="approve" class="btn btn-sm btn-success">Approve</button>
+              <button name="action" value="reject" class="btn btn-sm btn-danger">Reject</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+  <div class="empty-state"><p>No pending approvals. ✓</p></div>
+{% endif %}
+
+{% if stats.most_viewed %}
+<h2 class="section-title mt-3">Most Viewed Questions</h2>
+<div style="display:flex; flex-direction:column; gap:0.5rem;">
+  {% for q in stats.most_viewed %}
+  <a href="{% url 'question-detail' q.pk %}" class="question-card" style="text-decoration:none;">
+    <div style="font-weight:500; font-size:0.9rem;">{{ q.title|truncatechars:100 }}</div>
+    <div class="topic-card-meta">{{ q.view_count }} views</div>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

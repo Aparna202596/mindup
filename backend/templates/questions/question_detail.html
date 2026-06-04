@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}{{ question.title|truncatechars:60 }} — MindUp{% endblock %}
+{% block content %}
+<div class="breadcrumb">
+  <a href="{% url 'home' %}">Home</a><span class="breadcrumb-sep">/</span>
+  <a href="{% url 'question-list' %}">Questions</a><span class="breadcrumb-sep">/</span>
+  <span class="breadcrumb-current">Question</span>
+</div>
+
+<div class="layout-sidebar">
+  <div>{% include "includes/sidebar.html" %}</div>
+
+  <div>
+    <div class="card mb-3">
+      <div class="card-body">
+        <h1 class="question-detail-title">{{ question.title }}</h1>
+        <div class="question-meta mt-1">
+          <span>{{ question.subcategory.category.topic.name }}</span>
+          <span>→ {{ question.subcategory.category.name }}</span>
+          <span>→ {{ question.subcategory.name }}</span>
+          <span>· {{ question.view_count }} views</span>
+          <span>· Asked {{ question.created_at|date:"M d, Y" }}</span>
+          <span>· by {{ question.created_by.email }}</span>
+        </div>
+      </div>
+    </div>
+
+    <h2 class="section-title">{{ answers.count }} Answer{{ answers.count|pluralize }}</h2>
+
+    {% for answer in answers %}
+    <div class="answer-block mb-2">
+      <div class="answer-header">
+        <span>{{ answer.created_by.email }}</span>
+        <span>{{ answer.created_at|date:"M d, Y" }}</span>
+      </div>
+      <div class="answer-content">{{ answer.content }}</div>
+      {% if answer.points.exists %}
+      <div class="answer-points">
+        <div class="answer-points-title">Key Points</div>
+        {% for pt in answer.points.all %}
+        <div class="answer-point-item">
+          <div class="answer-point-bullet"></div>
+          <div>{{ pt.point }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% if user.is_authenticated %}
+      <div class="card-footer">
+        <a href="{% url 'answerpoint-create' answer.pk %}" class="btn btn-sm btn-secondary">+ Add Key Point</a>
+      </div>
+      {% endif %}
+    </div>
+    {% empty %}
+    <div class="empty-state"><p>No answers yet. Be the first to answer!</p></div>
+    {% endfor %}
+
+    {% if user.is_authenticated %}
+    <div class="card mt-3">
+      <div class="card-header">Write an Answer</div>
+      <div class="card-body">
+        <form method="post" action="{% url 'answer-create' question.pk %}">
+          {% csrf_token %}
+          {% for field in answer_form %}
+            <div class="form-group">{{ field }}
+              {% for err in field.errors %}<div class="invalid-feedback">{{ err }}</div>{% endfor %}
+            </div>
+          {% endfor %}
+          <button type="submit" class="btn btn-primary">Post Answer</button>
+        </form>
+      </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info mt-2"><a href="{% url 'account_login' %}">Sign in</a> to post an answer.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

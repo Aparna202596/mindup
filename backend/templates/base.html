@@ -1,25 +1,30 @@
+{% load static %}
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-
-    <title>MindUp</title>
-
-    {% load static %}
-
-    <link rel="stylesheet"
-            href="{% static 'css/style.css' %}">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}MindUp{% endblock %}</title>
+<link rel="stylesheet" href="{% static 'css/style.css' %}">
+{% block extra_css %}{% endblock %}
 </head>
+<body class="page-wrapper">
 
-<body>
+{% include "includes/navbar.html" %}
 
-    {% include 'includes/navbar.html' %}
+<main class="main-content">
+  <div class="container">
+    {% if messages %}
+      {% for msg in messages %}
+        <div class="alert alert-{{ msg.tags|default:'info' }}">{{ msg }}</div>
+      {% endfor %}
+    {% endif %}
+    {% block content %}{% endblock %}
+  </div>
+</main>
 
-    <main>
-        {% block content %}
-        {% endblock %}
-    </main>
-
-    {% include 'includes/footer.html' %}
-
+{% include "includes/footer.html" %}
+<script src="{% static 'js/main.js' %}"></script>
+{% block extra_js %}{% endblock %}
 </body>
 </html>

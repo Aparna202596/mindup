@@ -1,19 +1,22 @@
-{% extends 'base.html' %}
-
+{% extends "base.html" %}
+{% block title %}Answer — MindUp{% endblock %}
 {% block content %}
-
-<h2>Create</h2>
-
-<form method="post">
-
-    {% csrf_token %}
-
-    {{ form.as_p }}
-
-    <button type="submit">
-        Save
-    </button>
-
-</form>
-
+<div class="card form-card">
+  <div class="card-header">Answer: {{ question.title|truncatechars:60 }}</div>
+  <div class="card-body">
+    <form method="post">
+      {% csrf_token %}
+      {% for field in form %}
+        <div class="form-group">
+          <label>{{ field.label }}</label>{{ field }}
+          {% for err in field.errors %}<div class="invalid-feedback">{{ err }}</div>{% endfor %}
+        </div>
+      {% endfor %}
+      <div style="display:flex; gap:0.75rem; margin-top:1rem;">
+        <button type="submit" class="btn btn-primary">Post Answer</button>
+        <a href="{% url 'question-detail' question.pk %}" class="btn btn-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
 {% endblock %}

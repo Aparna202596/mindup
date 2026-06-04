@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Questions — MindUp{% endblock %}
+{% block content %}
+<div class="flex-between mb-2">
+  <div>
+    <h1 class="page-title">Questions</h1>
+    <p class="page-subtitle">Browse the knowledge base</p>
+  </div>
+  {% if user.is_authenticated %}
+    <a href="{% url 'question-create' %}" class="btn btn-primary">+ Ask Question</a>
+  {% endif %}
+</div>
+
+<form method="get" style="margin-bottom:1.5rem;">
+  <div style="display:flex; gap:0.5rem; max-width:480px;">
+    <input type="search" name="q" value="{{ search_query }}" placeholder="Search questions..." class="form-control">
+    <button type="submit" class="btn btn-secondary">Search</button>
+  </div>
+</form>
+
+{% if questions %}
+  <div style="display:flex; flex-direction:column; gap:0.75rem;">
+    {% for q in questions %}
+    <a href="{% url 'question-detail' q.pk %}" class="question-card" style="text-decoration:none;">
+      <div style="font-weight:500; font-size:1rem;">{{ q.title|truncatechars:150 }}</div>
+      <div class="topic-card-meta">
+        {{ q.subcategory.category.topic.name }} → {{ q.subcategory.name }}
+        &nbsp;·&nbsp; {{ q.answers.count }} answers
+        &nbsp;·&nbsp; {{ q.view_count }} views
+        &nbsp;·&nbsp; {{ q.created_at|date:"M d, Y" }}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  {% if is_paginated %}
+  <nav class="pagination">
+    {% if page_obj.has_previous %}
+      <span class="page-item"><a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">&laquo;</a></span>
+    {% endif %}
+    {% for num in page_obj.paginator.page_range %}
+      <span class="page-item {% if page_obj.number == num %}active{% endif %}">
+        <a href="?page={{ num }}">{{ num }}</a>
+      </span>
+    {% endfor %}
+    {% if page_obj.has_next %}
+      <span class="page-item"><a href="?page={{ page_obj.next_page_number %}}">&raquo;</a></span>
+    {% endif %}
+  </nav>
+  {% endif %}
+{% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">🔍</div>
+    <p>No questions found.</p>
+    {% if user.is_authenticated %}<a href="{% url 'question-create' %}" class="btn btn-primary mt-2">Ask the first question</a>{% endif %}
+  </div>
+{% endif %}
+{% endblock %}

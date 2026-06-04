@@ -1,0 +1,14 @@
+<aside class="sidebar">
+  <div class="sidebar-header">Browse</div>
+  <ul class="sidebar-nav">
+    <li><a href="{% url 'topic-list' %}">Topics</a></li>
+    <li><a href="{% url 'category-list' %}">Categories</a></li>
+    <li><a href="{% url 'question-list' %}">Questions</a></li>
+    <li><a href="{% url 'search' %}">Search</a></li>
+    {% if user.is_authenticated %}
+      <li><a href="{% url 'topic-create' %}">+ New Topic</a></li>
+      <li><a href="{% url 'category-create' %}">+ New Category</a></li>
+      <li><a href="{% url 'question-create' %}">+ Ask Question</a></li>
+    {% endif %}
+  </ul>
+</aside>

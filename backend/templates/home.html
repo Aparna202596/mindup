@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}MindUp — Knowledge Base{% endblock %}
+{% block content %}
+
+<div style="text-align:center; padding: 3rem 1rem 2rem;">
+  <h1 style="font-size:2.25rem; font-weight:800; margin-bottom:0.75rem;">Learn, Ask, Share</h1>
+  <p style="color:var(--text-muted); font-size:1.125rem; max-width:520px; margin:0 auto 2rem;">
+    MindUp is a structured knowledge base. Browse topics, ask questions, and build answers together.
+  </p>
+  <div style="display:flex; gap:0.75rem; justify-content:center; flex-wrap:wrap;">
+    <a href="{% url 'question-create' %}" class="btn btn-primary">Ask a Question</a>
+    <a href="{% url 'topic-list' %}" class="btn btn-secondary">Browse Topics</a>
+  </div>
+</div>
+
+{% if approved_topics %}
+<section class="mb-3">
+  <div class="flex-between mb-2">
+    <h2 class="section-title" style="margin:0;">Topics</h2>
+    <a href="{% url 'topic-list' %}" class="text-sm">View all →</a>
+  </div>
+  <div class="card-grid">
+    {% for topic in approved_topics %}
+    <a href="{% url 'topic-detail' topic.pk %}" class="topic-card" style="text-decoration:none;">
+      <div class="topic-card-title">{{ topic.name }}</div>
+      {% if topic.description %}
+        <div class="topic-card-meta">{{ topic.description|truncatechars:80 }}</div>
+      {% endif %}
+      <div class="topic-card-meta">{{ topic.categories.count }} categories</div>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if recent_questions %}
+<section>
+  <div class="flex-between mb-2">
+    <h2 class="section-title" style="margin:0;">Recent Questions</h2>
+    <a href="{% url 'question-list' %}" class="text-sm">View all →</a>
+  </div>
+  <div style="display:flex; flex-direction:column; gap:0.75rem;">
+    {% for q in recent_questions %}
+    <a href="{% url 'question-detail' q.pk %}" class="question-card" style="text-decoration:none;">
+      <div style="font-weight:500;">{{ q.title|truncatechars:120 }}</div>
+      <div class="topic-card-meta">
+        {{ q.subcategory.category.topic.name }} → {{ q.subcategory.category.name }} → {{ q.subcategory.name }}
+        &nbsp;·&nbsp; {{ q.answers.count }} answers &nbsp;·&nbsp; {{ q.view_count }} views
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Topics — MindUp{% endblock %}
+{% block content %}
+<div class="flex-between mb-2">
+  <div>
+    <h1 class="page-title">Topics</h1>
+    <p class="page-subtitle">Browse all approved topics</p>
+  </div>
+  {% if user.is_authenticated %}
+    <a href="{% url 'topic-create' %}" class="btn btn-primary">+ New Topic</a>
+  {% endif %}
+</div>
+
+<form method="get" style="margin-bottom:1.5rem;">
+  <div style="display:flex; gap:0.5rem; max-width:420px;">
+    <input type="search" name="q" value="{{ search_query }}" placeholder="Filter topics..." class="form-control">
+    <button type="submit" class="btn btn-secondary">Search</button>
+  </div>
+</form>
+
+{% if topics %}
+  <div class="card-grid">
+    {% for topic in topics %}
+    <a href="{% url 'topic-detail' topic.pk %}" class="topic-card" style="text-decoration:none;">
+      <div class="topic-card-title">{{ topic.name }}</div>
+      {% if topic.description %}
+        <div class="topic-card-meta">{{ topic.description|truncatechars:80 }}</div>
+      {% endif %}
+      <div class="topic-card-meta">{{ topic.categories.count }} categories</div>
+    </a>
+    {% endfor %}
+  </div>
+
+  {% if is_paginated %}
+  <nav class="pagination">
+    {% if page_obj.has_previous %}
+      <span class="page-item"><a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">&laquo;</a></span>
+    {% endif %}
+    {% for num in page_obj.paginator.page_range %}
+      <span class="page-item {% if page_obj.number == num %}active{% endif %}">
+        <a href="?page={{ num }}{% if search_query %}&q={{ search_query }}{% endif %}">{{ num }}</a>
+      </span>
+    {% endfor %}
+    {% if page_obj.has_next %}
+      <span class="page-item"><a href="?page={{ page_obj.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">&raquo;</a></span>
+    {% endif %}
+  </nav>
+  {% endif %}
+{% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">📚</div>
+    <p>No topics found.</p>
+    {% if user.is_authenticated %}<a href="{% url 'topic-create' %}" class="btn btn-primary mt-2">Create the first topic</a>{% endif %}
+  </div>
+{% endif %}
+{% endblock %}

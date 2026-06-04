@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Search — MindUp{% endblock %}
+{% block content %}
+<h1 class="page-title">Search</h1>
+
+<form method="get" style="margin-bottom:1.5rem;">
+  <div style="display:flex; gap:0.5rem; max-width:520px;">
+    <input type="search" name="q" value="{{ query }}" placeholder="Search anything..." class="form-control">
+    <button type="submit" class="btn btn-primary">Search</button>
+  </div>
+</form>
+
+{% if query %}
+  {% if results.questions or results.topics or results.categories %}
+
+    {% if results.topics %}
+    <section class="mb-3">
+      <h2 class="section-title">Topics</h2>
+      <div class="card-grid">
+        {% for t in results.topics %}
+        <a href="{% url 'topic-detail' t.pk %}" class="topic-card" style="text-decoration:none;">
+          <div class="topic-card-title">{{ t.name }}</div>
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if results.categories %}
+    <section class="mb-3">
+      <h2 class="section-title">Categories</h2>
+      <div style="display:flex; flex-direction:column; gap:0.5rem;">
+        {% for c in results.categories %}
+        <a href="{% url 'category-detail' c.pk %}" class="question-card" style="text-decoration:none;">
+          <div style="font-weight:500;">{{ c.name }}</div>
+          <div class="topic-card-meta">{{ c.topic.name }}</div>
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if results.questions %}
+    <section>
+      <h2 class="section-title">Questions</h2>
+      <div style="display:flex; flex-direction:column; gap:0.75rem;">
+        {% for q in results.questions %}
+        <a href="{% url 'question-detail' q.pk %}" class="question-card" style="text-decoration:none;">
+          <div style="font-weight:500;">{{ q.title|truncatechars:150 }}</div>
+          <div class="topic-card-meta">{{ q.subcategory.category.topic.name }} → {{ q.subcategory.name }} · {{ q.answers.count }} answers</div>
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+  {% else %}
+    <div class="empty-state">
+      <p>No results found for "<strong>{{ query }}</strong>".</p>
+    </div>
+  {% endif %}
+{% endif %}
+{% endblock %}

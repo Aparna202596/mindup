@@ -1,16 +1,16 @@
 {% extends "base.html" %}
-{% block title %}New Category — MindUp{% endblock %}
+{% block title %}Upload PDF — MindUp{% endblock %}
 {% block content %}
 <div class="breadcrumb">
   <a href="{% url 'home' %}">Home</a><span class="breadcrumb-sep">/</span>
-  <a href="{% url 'category-list' %}">Categories</a><span class="breadcrumb-sep">/</span>
-  <span class="breadcrumb-current">New</span>
+  <span class="breadcrumb-current">Upload PDF</span>
 </div>
+
 <div class="card form-card">
-  <div class="card-header">Create New Category</div>
+  <div class="card-header">Bulk PDF Upload</div>
   <div class="card-body">
-    <p class="text-muted text-sm mb-2">Categories require admin approval.</p>
-    <form method="post">
+    <p class="text-muted text-sm mb-2">Upload a PDF to automatically extract topics, questions, and answers. Max 10 MB.</p>
+    <form method="post" enctype="multipart/form-data">
       {% csrf_token %}
       {% for field in form %}
         <div class="form-group">
@@ -19,8 +19,8 @@
         </div>
       {% endfor %}
       <div style="display:flex; gap:0.75rem; margin-top:1.5rem;">
-        <button type="submit" class="btn btn-primary">Submit for Approval</button>
-        <a href="{% url 'category-list' %}" class="btn btn-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary">Upload PDF</button>
+        <a href="{% url 'upload-history' %}" class="btn btn-secondary">My Uploads</a>
       </div>
     </form>
   </div>

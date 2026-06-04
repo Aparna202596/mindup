@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ topic.name }} — MindUp{% endblock %}
+{% block content %}
+<div class="breadcrumb">
+  <a href="{% url 'home' %}">Home</a><span class="breadcrumb-sep">/</span>
+  <a href="{% url 'topic-list' %}">Topics</a><span class="breadcrumb-sep">/</span>
+  <span class="breadcrumb-current">{{ topic.name }}</span>
+</div>
+
+<div class="flex-between mb-3">
+  <div>
+    <h1 class="page-title">{{ topic.name }}</h1>
+    {% if topic.description %}<p class="page-subtitle">{{ topic.description }}</p>{% endif %}
+  </div>
+  {% if user.is_authenticated %}
+    <a href="{% url 'category-create' %}" class="btn btn-primary">+ Add Category</a>
+  {% endif %}
+</div>
+
+{% if categories %}
+  <div class="card-grid">
+    {% for cat in categories %}
+    <a href="{% url 'category-detail' cat.pk %}" class="topic-card" style="text-decoration:none;">
+      <div class="topic-card-title">{{ cat.name }}</div>
+      {% if cat.description %}<div class="topic-card-meta">{{ cat.description|truncatechars:60 }}</div>{% endif %}
+      <div class="topic-card-meta">{{ cat.subcategories.count }} subcategories</div>
+    </a>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="empty-state">
+    <p>No categories yet for this topic.</p>
+  </div>
+{% endif %}
+{% endblock %}

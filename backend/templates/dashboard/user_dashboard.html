@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}My Dashboard — MindUp{% endblock %}
+{% block content %}
+<h1 class="page-title">My Dashboard</h1>
+<p class="page-subtitle">Welcome, {{ user.email }}</p>
+
+{% if notifications %}
+<div class="mb-3">
+  <h2 class="section-title">Notifications</h2>
+  {% for n in notifications %}
+  <div class="alert alert-info" style="justify-content:space-between;">
+    <div><strong>{{ n.title }}</strong> — {{ n.message }}</div>
+    <a href="{% url 'notification-read' n.pk %}" class="btn btn-sm btn-secondary">Mark read</a>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:1.5rem; flex-wrap:wrap;">
+  <div>
+    <h2 class="section-title">My Questions</h2>
+    {% for q in my_questions %}
+    <div class="question-card mb-1" style="margin-bottom:0.5rem;">
+      <a href="{% url 'question-detail' q.pk %}" style="font-weight:500; font-size:0.9rem;">{{ q.title|truncatechars:80 }}</a>
+      <div class="topic-card-meta">{{ q.created_at|date:"M d, Y" }}</div>
+    </div>
+    {% empty %}<p class="text-muted text-sm">No questions yet. <a href="{% url 'question-create' %}">Ask one</a>.</p>{% endfor %}
+  </div>
+
+  <div>
+    <h2 class="section-title">My Answers</h2>
+    {% for a in my_answers %}
+    <div class="question-card mb-1" style="margin-bottom:0.5rem;">
+      <a href="{% url 'question-detail' a.question.pk %}" style="font-size:0.9rem;">{{ a.content|truncatechars:80 }}</a>
+      <div class="topic-card-meta">{{ a.created_at|date:"M d, Y" }}</div>
+    </div>
+    {% empty %}<p class="text-muted text-sm">No answers yet.</p>{% endfor %}
+  </div>
+
+  <div>
+    <h2 class="section-title">My Uploads</h2>
+    {% for u in my_uploads %}
+    <div class="question-card mb-1" style="margin-bottom:0.5rem;">
+      <div style="font-size:0.9rem;">{{ u.file.name|cut:"pdfs/" }}</div>
+      <span class="badge badge-{{ u.process_status }}">{{ u.get_process_status_display }}</span>
+    </div>
+    {% empty %}<p class="text-muted text-sm">No uploads. <a href="{% url 'pdf-upload' %}">Upload a PDF</a>.</p>{% endfor %}
+  </div>
+</div>
+{% endblock %}
