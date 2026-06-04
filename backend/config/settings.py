@@ -35,16 +35,8 @@ INSTALLED_APPS = [
     'crispy_bootstrap5',
 
     'apps.core',
-    'apps.users',
-    'apps.topics',
-    'apps.categories',
-    'apps.questions',
-    'apps.answers',
-    'apps.uploads',
-    'apps.approvals',
-    'apps.notifications',
-    'apps.search',
-    'apps.analytics_dashboard',
+    'apps.dashboard',
+
 ]
 
 MIDDLEWARE = [
@@ -90,7 +82,7 @@ DATABASES = {
     }
 }
 
-AUTH_USER_MODEL = "users.CustomUser"
+AUTH_USER_MODEL = "core.CustomUser"
 
 AUTH_PASSWORD_VALIDATORS = [
     {
