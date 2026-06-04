@@ -2,7 +2,7 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 from django.contrib.messages import constants as messages
-
+from decouple import config
 # ==============================================================================
 # 1. INITIALIZATION & CORE PATHS
 # ==============================================================================
@@ -130,11 +130,14 @@ AUTH_PASSWORD_VALIDATORS = [
 # ==============================================================================
 # 8. DJANGO-ALLAUTH SPECIFIC SETTINGS
 # ==============================================================================
-SITE_ID = 1
+SITE_ID = 2
 
 # Resolved warning conflicts: using email as the primary identification method
 ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
+# Disable username field and make email the unique identifier
+ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 # Registration adjustments
 ACCOUNT_EMAIL_VERIFICATION = "none"
 SOCIALACCOUNT_LOGIN_ON_GET = True
@@ -143,7 +146,8 @@ SOCIALACCOUNT_LOGIN_ON_GET = True
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/"
 
-
+# Override admin login template
+ADMIN_LOGIN_TEMPLATE = "admin/login.html"
 # ==============================================================================
 # 9. INTERNATIONALIZATION & LOCALIZATION
 # ==============================================================================
@@ -172,4 +176,24 @@ MESSAGE_TAGS = {
     messages.SUCCESS: 'success',
     messages.WARNING: 'warning',
     messages.ERROR: 'danger',
+}
+# ==============================================================================
+# 12. SOCIAL ACCOUNT PROVIDERS (django-allauth)
+# ==============================================================================
+SOCIALACCOUNT_PROVIDERS = {
+    "google": {
+        "MANAGED": True,
+        "APP": {
+            "client_id": os.getenv("GOOGLE_CLIENT_ID"),
+            "secret": os.getenv("GOOGLE_SECRET"),
+            "key": "",
+        },
+        "SCOPE": [
+            "profile",
+            "email",
+        ],
+        "AUTH_PARAMS": {
+            "access_type": "online",
+        }
+    }
 }

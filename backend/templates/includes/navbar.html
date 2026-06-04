@@ -4,7 +4,8 @@
     <a href="{% url 'home' %}" class="navbar-brand">MindUp</a>
 
     <form class="navbar-search" method="get" action="{% url 'search' %}">
-      <input type="search" name="q" placeholder="Search..." value="{{ request.GET.q|default:'' }}">
+      <input type="search" name="q" placeholder="Search questions, topics..."
+             value="{{ request.GET.q|default:'' }}" autocomplete="off">
     </form>
 
     <ul class="navbar-nav">
@@ -13,13 +14,18 @@
       {% if user.is_authenticated %}
         <li><a href="{% url 'question-create' %}">Ask</a></li>
         <li><a href="{% url 'pdf-upload' %}">Upload</a></li>
-        <li><a href="{% url 'user-dashboard' %}">Dashboard</a></li>
+        <li><a href="{% url 'user-dashboard' %}">
+          Dashboard
+          {% if user.notifications.filter %}
+            <span class="notif-dot"></span>
+          {% endif %}
+        </a></li>
         {% if user.is_staff %}
           <li><a href="{% url 'admin-dashboard' %}">Admin</a></li>
         {% endif %}
         <li><a href="{% url 'account_logout' %}">Logout</a></li>
       {% else %}
-        <li><a href="{% url 'account_login' %}" class="btn-login">Sign in with Google</a></li>
+        <li><a href="{% url 'account_login' %}" class="btn-nav-cta">Sign In</a></li>
       {% endif %}
     </ul>
   </div>

@@ -279,10 +279,14 @@ def pdf_upload_view(request):
         upload = form.save(commit=False)
         upload.uploaded_by = request.user
         upload.save()
-        messages.success(request, "PDF uploaded. Processing will begin shortly.")
+
+        # Process synchronously for now (Celery can replace this later)
+        from apps.core.services.pdf_processor import process_pdf
+        process_pdf(str(upload.id))
+
+        messages.success(request, "PDF uploaded and processed.")
         return redirect("upload-history")
     return render(request, "uploads/pdf_upload.html", {"form": form})
-
 
 @login_required
 def upload_history_view(request):

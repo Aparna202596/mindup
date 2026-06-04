@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Sign Out — MindUp{% endblock %}
+{% block content %}
+<div style="max-width:380px; margin:3rem auto; text-align:center;">
+  <div class="card">
+    <div class="card-body" style="padding:2rem;">
+      <h2 style="margin-bottom:1rem;">Sign out?</h2>
+      <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary">Yes, sign out</button>
+        <a href="{% url 'home' %}" class="btn btn-secondary" style="margin-left:0.5rem;">Cancel</a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

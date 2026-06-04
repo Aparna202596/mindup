@@ -1,10 +1,14 @@
 <footer class="footer">
   <div class="container footer-inner">
-    <span>&copy; 2025 MindUp — Knowledge Management System</span>
-    <span class="flex gap-2">
+    <span style="font-weight:600;">MindUp</span>
+    <div class="footer-links">
       <a href="{% url 'topic-list' %}">Topics</a>
       <a href="{% url 'question-list' %}">Questions</a>
       <a href="{% url 'search' %}">Search</a>
-    </span>
+      {% if user.is_authenticated %}
+        <a href="{% url 'pdf-upload' %}">Upload PDF</a>
+      {% endif %}
+    </div>
+    <span class="text-xs">© 2025 MindUp</span>
   </div>
 </footer>

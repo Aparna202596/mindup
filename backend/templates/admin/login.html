@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% load i18n static %}
+{% block title %}Admin Login — MindUp{% endblock %}
+{% block content %}
+<div style="max-width:420px; margin:4rem auto;">
+  <div style="text-align:center; margin-bottom:2rem;">
+    <div style="font-size:2rem; font-weight:800; color:var(--primary); letter-spacing:-0.03em;">MindUp</div>
+    <div style="color:var(--text-muted); font-size:0.9rem; margin-top:0.25rem;">Administration Panel</div>
+  </div>
+
+  <div class="card">
+    <div class="card-header" style="text-align:center;">Sign in to continue</div>
+    <div class="card-body" style="padding:1.75rem;">
+
+      {% if form.errors %}
+      <div class="alert alert-danger">
+        Invalid credentials. Please try again.
+      </div>
+      {% endif %}
+
+      {% if next %}
+        {% if user.is_authenticated %}
+        <div class="alert alert-warning">
+          Your account does not have access to this page.
+        </div>
+        {% endif %}
+      {% endif %}
+
+      <form method="post" action="{{ request.get_full_path }}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ next }}">
+
+        <div class="form-group">
+          <label>{% trans "Email" %}</label>
+          <input type="email" name="username" autofocus autocomplete="email"
+                 class="form-control" placeholder="admin@example.com"
+                 value="{{ form.username.value|default:'' }}">
+        </div>
+        <div class="form-group">
+          <label>{% trans "Password" %}</label>
+          <input type="password" name="password" autocomplete="current-password"
+                 class="form-control" placeholder="••••••••">
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width:100%; margin-top:0.5rem; justify-content:center;">
+          Sign In
+        </button>
+      </form>
+
+      <div style="margin-top:1.5rem; padding-top:1.25rem; border-top:1px solid var(--border); text-align:center;">
+        <p style="font-size:0.8125rem; color:var(--text-muted);">Regular users sign in with Google</p>
+        <a href="{% url 'account_login' %}" class="btn btn-outline btn-sm" style="margin-top:0.5rem;">
+          Sign in with Google
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <p style="text-align:center; margin-top:1.5rem; font-size:0.8125rem; color:var(--text-muted);">
+    <a href="{% url 'home' %}">← Back to MindUp</a>
+  </p>
+</div>
+{% endblock %}
