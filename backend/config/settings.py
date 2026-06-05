@@ -136,7 +136,6 @@ SITE_ID = 2
 ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
 # Disable username field and make email the unique identifier
-ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 # Registration adjustments
 ACCOUNT_EMAIL_VERIFICATION = "none"
@@ -147,7 +146,8 @@ LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/"
 
 # Override admin login template
-ADMIN_LOGIN_TEMPLATE = "admin/login.html"
+LOGIN_REDIRECT_URL = "smart-login-redirect"  
+LOGOUT_REDIRECT_URL = "/"
 # ==============================================================================
 # 9. INTERNATIONALIZATION & LOCALIZATION
 # ==============================================================================

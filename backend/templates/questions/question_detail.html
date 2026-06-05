@@ -13,27 +13,37 @@
   <div>
     <div class="card mb-3">
       <div class="card-body">
-        <h1 class="question-detail-title">{{ question.title }}</h1>
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:1rem;">
+          <h1 class="question-detail-title">{{ question.title }}</h1>
+          {% if user.is_admin %}
+          <a href="{% url 'question-delete' question.pk %}" class="btn btn-sm btn-danger" style="flex-shrink:0;">Delete</a>
+          {% endif %}
+        </div>
         <div class="question-meta mt-1">
           <span>{{ question.subcategory.category.topic.name }}</span>
           <span>→ {{ question.subcategory.category.name }}</span>
           <span>→ {{ question.subcategory.name }}</span>
-          <span>· {{ question.view_count }} views</span>
-          <span>· Asked {{ question.created_at|date:"M d, Y" }}</span>
-          <span>· by {{ question.created_by.email }}</span>
+          <span>&nbsp;· {{ question.view_count }} views</span>
+          <span>&nbsp;· {{ question.created_at|date:"M d, Y" }}</span>
+          <span>&nbsp;· by {{ question.created_by.email }}</span>
         </div>
       </div>
     </div>
 
-    <h2 class="section-title">{{ answers.count }} Answer{{ answers.count|pluralize }}</h2>
+    <div class="flex-between mb-2">
+      <h2 class="section-title">{{ answers.count }} Answer{{ answers.count|pluralize }}</h2>
+    </div>
 
     {% for answer in answers %}
-    <div class="answer-block mb-2">
+    <div class="answer-block">
       <div class="answer-header">
-        <span>{{ answer.created_by.email }}</span>
-        <span>{{ answer.created_at|date:"M d, Y" }}</span>
+        <span>{{ answer.created_by.email }} · {{ answer.created_at|date:"M d, Y" }}</span>
+        {% if user.is_admin %}
+        <a href="{% url 'answer-delete' answer.pk %}" class="btn btn-sm btn-danger">Delete</a>
+        {% endif %}
       </div>
       <div class="answer-content">{{ answer.content }}</div>
+
       {% if answer.points.exists %}
       <div class="answer-points">
         <div class="answer-points-title">Key Points</div>
@@ -45,6 +55,7 @@
         {% endfor %}
       </div>
       {% endif %}
+
       {% if user.is_authenticated %}
       <div class="card-footer">
         <a href="{% url 'answerpoint-create' answer.pk %}" class="btn btn-sm btn-secondary">+ Add Key Point</a>
@@ -52,7 +63,9 @@
       {% endif %}
     </div>
     {% empty %}
-    <div class="empty-state"><p>No answers yet. Be the first to answer!</p></div>
+    <div class="empty-state">
+      <p>No answers yet. Be the first to answer!</p>
+    </div>
     {% endfor %}
 
     {% if user.is_authenticated %}
@@ -62,7 +75,8 @@
         <form method="post" action="{% url 'answer-create' question.pk %}">
           {% csrf_token %}
           {% for field in answer_form %}
-            <div class="form-group">{{ field }}
+            <div class="form-group">
+              {{ field }}
               {% for err in field.errors %}<div class="invalid-feedback">{{ err }}</div>{% endfor %}
             </div>
           {% endfor %}
@@ -71,7 +85,9 @@
       </div>
     </div>
     {% else %}
-    <div class="alert alert-info mt-2"><a href="{% url 'account_login' %}">Sign in</a> to post an answer.</div>
+    <div class="alert alert-info mt-2">
+      <a href="{% url 'account_login' %}">Sign in with Google</a> to post an answer.
+    </div>
     {% endif %}
   </div>
 </div>

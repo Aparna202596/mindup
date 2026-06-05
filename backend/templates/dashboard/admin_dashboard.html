@@ -1,59 +1,140 @@
 {% extends "base.html" %}
 {% block title %}Admin Dashboard — MindUp{% endblock %}
 {% block content %}
-<h1 class="page-title">Admin Dashboard</h1>
 
-<div class="stats-grid mb-3">
-  <div class="stat-card"><div class="stat-number">{{ stats.users }}</div><div class="stat-label">Users</div></div>
-  <div class="stat-card"><div class="stat-number">{{ stats.topics }}</div><div class="stat-label">Topics</div></div>
-  <div class="stat-card"><div class="stat-number">{{ stats.categories }}</div><div class="stat-label">Categories</div></div>
-  <div class="stat-card"><div class="stat-number">{{ stats.subcategories }}</div><div class="stat-label">Subcategories</div></div>
-  <div class="stat-card"><div class="stat-number">{{ stats.questions }}</div><div class="stat-label">Questions</div></div>
-  <div class="stat-card"><div class="stat-number">{{ stats.answers }}</div><div class="stat-label">Answers</div></div>
-  <div class="stat-card"><div class="stat-number">{{ stats.answer_points }}</div><div class="stat-label">Answer Points</div></div>
-  <div class="stat-card"><div class="stat-number">{{ stats.pending_approvals }}</div><div class="stat-label">Pending</div></div>
-</div>
-
-<h2 class="section-title">Approval Queue</h2>
-{% if pending %}
-<div class="card">
-  <div class="table-wrapper">
-    <table>
-      <thead>
-        <tr><th>Type</th><th>Requested by</th><th>Date</th><th>Actions</th></tr>
-      </thead>
-      <tbody>
-        {% for item in pending %}
-        <tr>
-          <td><span class="badge badge-pending">{{ item.object_type|title }}</span></td>
-          <td>{{ item.requested_by.email }}</td>
-          <td>{{ item.created_at|date:"M d, Y H:i" }}</td>
-          <td>
-            <form method="post" action="{% url 'approve-item' item.pk %}" style="display:inline;">
-              {% csrf_token %}
-              <button name="action" value="approve" class="btn btn-sm btn-success">Approve</button>
-              <button name="action" value="reject" class="btn btn-sm btn-danger">Reject</button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+<div class="flex-between mb-3">
+  <div>
+    <h1 class="page-title">Admin Dashboard</h1>
+    <p class="page-subtitle">System overview and content management</p>
+  </div>
+  <div style="display:flex; gap:0.5rem;">
+    <a href="{% url 'audit-log' %}" class="btn btn-secondary">Audit Log</a>
+    <a href="{% url 'user-list' %}" class="btn btn-secondary">Users</a>
+    <a href="{% url 'admin:index' %}" class="btn btn-outline">Django Admin</a>
   </div>
 </div>
-{% else %}
-  <div class="empty-state"><p>No pending approvals. ✓</p></div>
-{% endif %}
 
-{% if stats.most_viewed %}
-<h2 class="section-title mt-3">Most Viewed Questions</h2>
-<div style="display:flex; flex-direction:column; gap:0.5rem;">
-  {% for q in stats.most_viewed %}
-  <a href="{% url 'question-detail' q.pk %}" class="question-card" style="text-decoration:none;">
-    <div style="font-weight:500; font-size:0.9rem;">{{ q.title|truncatechars:100 }}</div>
-    <div class="topic-card-meta">{{ q.view_count }} views</div>
-  </a>
-  {% endfor %}
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-number">{{ stats.users }}</div>
+    <div class="stat-label">Users</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ stats.topics }}</div>
+    <div class="stat-label">Topics</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ stats.categories }}</div>
+    <div class="stat-label">Categories</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ stats.subcategories }}</div>
+    <div class="stat-label">Subcategories</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ stats.questions }}</div>
+    <div class="stat-label">Questions</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ stats.answers }}</div>
+    <div class="stat-label">Answers</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-number">{{ stats.answer_points }}</div>
+    <div class="stat-label">Answer Points</div>
+  </div>
+  <div class="stat-card" style="border-color:{% if stats.pending_approvals > 0 %}#fde68a{% else %}var(--border){% endif %};">
+    <div class="stat-number" style="color:{% if stats.pending_approvals > 0 %}var(--warning){% else %}var(--primary){% endif %};">
+      {{ stats.pending_approvals }}
+    </div>
+    <div class="stat-label">Pending</div>
+  </div>
 </div>
-{% endif %}
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:2rem; align-items:start;">
+
+  <div>
+    <div class="section-header">
+      <h2 class="section-title">Approval Queue</h2>
+      <span class="badge badge-pending">{{ pending|length }} pending</span>
+    </div>
+
+    {% if pending %}
+    <div class="card">
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr><th>Type</th><th>Requested by</th><th>Date</th><th>Action</th></tr>
+          </thead>
+          <tbody>
+            {% for item in pending %}
+            <tr class="approval-row">
+              <td><span class="badge badge-pending">{{ item.object_type|title }}</span></td>
+              <td class="text-sm">{{ item.requested_by.email }}</td>
+              <td class="text-sm text-muted">{{ item.created_at|date:"M d, Y" }}</td>
+              <td>
+                <form method="post" action="{% url 'approve-item' item.pk %}" class="approve-btn-group">
+                  {% csrf_token %}
+                  <button name="action" value="approve" class="btn btn-sm btn-success">✓ Approve</button>
+                  <button name="action" value="reject"  class="btn btn-sm btn-danger">✗ Reject</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% else %}
+    <div class="empty-state" style="padding:2rem;">
+      <p>No pending approvals ✓</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <div>
+    <div class="section-header">
+      <h2 class="section-title">Most Viewed Questions</h2>
+    </div>
+    {% if stats.most_viewed %}
+    <div style="display:flex; flex-direction:column; gap:0.625rem;">
+      {% for q in stats.most_viewed %}
+      <a href="{% url 'question-detail' q.pk %}" class="question-card" style="text-decoration:none;">
+        <div class="topic-card-title" style="font-size:0.9rem;">{{ q.title|truncatechars:90 }}</div>
+        <div class="topic-card-meta">{{ q.view_count }} views · {{ q.answers.count }} answers</div>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state" style="padding:2rem;"><p>No questions yet.</p></div>
+    {% endif %}
+
+    <div class="section-header mt-3">
+      <h2 class="section-title">Recent Uploads</h2>
+    </div>
+    {% with uploads=stats.recent_uploads %}
+    {% if uploads %}
+    <div class="card">
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>User</th><th>Status</th><th>Date</th></tr></thead>
+          <tbody>
+            {% for u in uploads %}
+            <tr>
+              <td class="text-sm">{{ u.uploaded_by.email }}</td>
+              <td><span class="badge badge-{{ u.process_status }}">{{ u.get_process_status_display }}</span></td>
+              <td class="text-sm text-muted">{{ u.created_at|date:"M d, Y" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% else %}
+    <div class="empty-state" style="padding:2rem;"><p>No uploads yet.</p></div>
+    {% endif %}
+    {% endwith %}
+  </div>
+
+</div>
 {% endblock %}

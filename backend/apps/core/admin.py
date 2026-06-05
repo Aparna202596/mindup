@@ -5,8 +5,6 @@ from apps.core.models import (
     Question, Answer, AnswerPoint, PDFUpload,
     ApprovalQueue, Notification, AuditLog,
 )
-
-
 @admin.register(CustomUser)
 class CustomUserAdmin(UserAdmin):
     list_display = ("email", "role", "is_staff", "date_joined")

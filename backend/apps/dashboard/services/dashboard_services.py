@@ -15,5 +15,6 @@ def get_dashboard_stats():
         "answer_points": AnswerPoint.objects.count(),
         "pending_approvals": ApprovalQueue.objects.filter(is_approved__isnull=True).count(),
         "pdf_uploads": PDFUpload.objects.count(),
-        "most_viewed": Question.objects.order_by("-view_count")[:10],
+        "most_viewed": Question.objects.order_by("-view_count")[:5],
+        "recent_uploads": PDFUpload.objects.select_related("uploaded_by").order_by("-created_at")[:5],
     }
