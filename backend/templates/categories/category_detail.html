@@ -4,14 +4,20 @@
 <div class="breadcrumb">
   <a href="{% url 'home' %}">Home</a><span class="breadcrumb-sep">/</span>
   <a href="{% url 'topic-list' %}">Topics</a><span class="breadcrumb-sep">/</span>
-  <a href="{% url 'topic-detail' category.topic.pk %}">{{ category.topic.name }}</a><span class="breadcrumb-sep">/</span>
+  <a href="{% url 'topic-detail' category.topic.pk %}">{{ category.topic.name }}</a>
+  <span class="breadcrumb-sep">/</span>
   <span class="breadcrumb-current">{{ category.name }}</span>
 </div>
 
 <div class="flex-between mb-3">
-  <h1 class="page-title">{{ category.name }}</h1>
+  <div>
+    <h1 class="page-title">{{ category.name }}</h1>
+    {% if category.description %}<p class="page-subtitle">{{ category.description }}</p>{% endif %}
+  </div>
   {% if user.is_authenticated %}
-    <a href="{% url 'subcategory-create' %}" class="btn btn-primary">+ Add Subcategory</a>
+    <a href="{% url 'subcategory-create-under' category.pk %}" class="btn btn-primary">
+      + Add Subcategory
+    </a>
   {% endif %}
 </div>
 
@@ -25,6 +31,14 @@
     {% endfor %}
   </div>
 {% else %}
-  <div class="empty-state"><p>No subcategories yet.</p></div>
+  <div class="empty-state">
+    <div class="empty-state-icon">📂</div>
+    <p>No subcategories yet.</p>
+    {% if user.is_authenticated %}
+      <a href="{% url 'subcategory-create-under' category.pk %}" class="btn btn-primary mt-2">
+        Add the first subcategory
+      </a>
+    {% endif %}
+  </div>
 {% endif %}
 {% endblock %}

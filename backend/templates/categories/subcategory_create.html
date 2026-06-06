@@ -1,21 +1,43 @@
 {% extends "base.html" %}
 {% block title %}New Subcategory — MindUp{% endblock %}
 {% block content %}
+<div class="breadcrumb">
+  <a href="{% url 'home' %}">Home</a><span class="breadcrumb-sep">/</span>
+  <a href="{% url 'category-list' %}">Categories</a><span class="breadcrumb-sep">/</span>
+  {% if preselected_category %}
+    <a href="{% url 'category-detail' preselected_category.pk %}">{{ preselected_category.name }}</a>
+    <span class="breadcrumb-sep">/</span>
+  {% endif %}
+  <span class="breadcrumb-current">New Subcategory</span>
+</div>
+
 <div class="card form-card">
-  <div class="card-header">Create New Subcategory</div>
+  <div class="card-header">
+    Create Subcategory
+    {% if preselected_category %}
+      under <strong>{{ preselected_category.name }}</strong>
+    {% endif %}
+  </div>
   <div class="card-body">
-    <p class="text-muted text-sm mb-2">Subcategories require admin approval.</p>
+    <p class="text-muted text-sm mb-3">Subcategories require admin approval before going live.</p>
     <form method="post">
       {% csrf_token %}
       {% for field in form %}
         <div class="form-group">
-          <label>{{ field.label }}</label>{{ field }}
-          {% for err in field.errors %}<div class="invalid-feedback">{{ err }}</div>{% endfor %}
+          <label>{{ field.label }}</label>
+          {{ field }}
+          {% for err in field.errors %}
+            <div class="invalid-feedback">{{ err }}</div>
+          {% endfor %}
         </div>
       {% endfor %}
       <div style="display:flex; gap:0.75rem; margin-top:1.5rem;">
-        <button type="submit" class="btn btn-primary">Submit</button>
-        <a href="{% url 'category-list' %}" class="btn btn-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary">Submit for Approval</button>
+        {% if preselected_category %}
+          <a href="{% url 'category-detail' preselected_category.pk %}" class="btn btn-secondary">Cancel</a>
+        {% else %}
+          <a href="{% url 'category-list' %}" class="btn btn-secondary">Cancel</a>
+        {% endif %}
       </div>
     </form>
   </div>

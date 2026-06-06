@@ -7,15 +7,21 @@
       Delete {{ type }}
     </div>
     <div class="card-body" style="padding:1.75rem;">
-      <p style="margin-bottom:1.5rem;">
+      <p style="margin-bottom:1.5rem; line-height:1.6;">
         Are you sure you want to permanently delete
         <strong>{{ object }}</strong>?
-        This action cannot be undone.
+        This cannot be undone and will remove all related content.
       </p>
       <form method="post" style="display:flex; gap:0.75rem;">
         {% csrf_token %}
-        <button type="submit" class="btn btn-danger">Yes, Delete</button>
-        <a href="javascript:history.back()" class="btn btn-secondary">Cancel</a>
+        <button type="submit" class="btn btn-danger">Yes, Delete Permanently</button>
+        {% if cancel_url %}
+          <a href="{% url cancel_url %}" class="btn btn-secondary">Cancel</a>
+        {% elif cancel_href %}
+          <a href="{{ cancel_href }}" class="btn btn-secondary">Cancel</a>
+        {% else %}
+          <a href="javascript:history.back()" class="btn btn-secondary">Cancel</a>
+        {% endif %}
       </form>
     </div>
   </div>

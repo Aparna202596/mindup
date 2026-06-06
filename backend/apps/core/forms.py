@@ -10,14 +10,17 @@ from apps.core.validators import (
     validate_pdf_extension,
 )
 
+WIDGET = {"class": "form-control"}
+SELECT = {"class": "form-select"}
+
 
 class TopicForm(forms.ModelForm):
     class Meta:
         model = Topic
         fields = ["name", "description"]
         widgets = {
-            "name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Topic name"}),
-            "description": forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Brief description"}),
+            "name": forms.TextInput(attrs={**WIDGET, "placeholder": "Topic name"}),
+            "description": forms.Textarea(attrs={**WIDGET, "rows": 3}),
         }
 
     def clean_name(self):
@@ -26,14 +29,26 @@ class TopicForm(forms.ModelForm):
         return name
 
 
+class TopicEditForm(forms.ModelForm):
+    """Admin edit — can change status too."""
+    class Meta:
+        model = Topic
+        fields = ["name", "description", "status"]
+        widgets = {
+            "name": forms.TextInput(attrs=WIDGET),
+            "description": forms.Textarea(attrs={**WIDGET, "rows": 3}),
+            "status": forms.Select(attrs=SELECT),
+        }
+
+
 class CategoryForm(forms.ModelForm):
     class Meta:
         model = Category
         fields = ["topic", "name", "description"]
         widgets = {
-            "topic": forms.Select(attrs={"class": "form-select"}),
-            "name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Category name"}),
-            "description": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "topic": forms.Select(attrs=SELECT),
+            "name": forms.TextInput(attrs={**WIDGET, "placeholder": "Category name"}),
+            "description": forms.Textarea(attrs={**WIDGET, "rows": 3}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -41,18 +56,53 @@ class CategoryForm(forms.ModelForm):
         self.fields["topic"].queryset = Topic.objects.filter(status="approved")
 
 
+class CategoryEditForm(forms.ModelForm):
+    class Meta:
+        model = Category
+        fields = ["topic", "name", "description", "status"]
+        widgets = {
+            "topic": forms.Select(attrs=SELECT),
+            "name": forms.TextInput(attrs=WIDGET),
+            "description": forms.Textarea(attrs={**WIDGET, "rows": 3}),
+            "status": forms.Select(attrs=SELECT),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["topic"].queryset = Topic.objects.all()
+
+
 class SubCategoryForm(forms.ModelForm):
     class Meta:
         model = SubCategory
         fields = ["category", "name"]
         widgets = {
-            "category": forms.Select(attrs={"class": "form-select"}),
-            "name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Subcategory name"}),
+            "category": forms.Select(attrs=SELECT),
+            "name": forms.TextInput(attrs={**WIDGET, "placeholder": "Subcategory name"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        # Accept optional category_pk to pre-select
+        category_pk = kwargs.pop("category_pk", None)
+        super().__init__(*args, **kwargs)
+        self.fields["category"].queryset = Category.objects.filter(status="approved")
+        if category_pk:
+            self.fields["category"].initial = category_pk
+
+
+class SubCategoryEditForm(forms.ModelForm):
+    class Meta:
+        model = SubCategory
+        fields = ["category", "name", "status"]
+        widgets = {
+            "category": forms.Select(attrs=SELECT),
+            "name": forms.TextInput(attrs=WIDGET),
+            "status": forms.Select(attrs=SELECT),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["category"].queryset = Category.objects.filter(status="approved")
+        self.fields["category"].queryset = Category.objects.all()
 
 
 class QuestionForm(forms.ModelForm):
@@ -60,13 +110,15 @@ class QuestionForm(forms.ModelForm):
         model = Question
         fields = ["subcategory", "title"]
         widgets = {
-            "subcategory": forms.Select(attrs={"class": "form-select"}),
-            "title": forms.Textarea(attrs={"class": "form-control", "rows": 3, "placeholder": "Ask your question..."}),
+            "subcategory": forms.Select(attrs=SELECT),
+            "title": forms.Textarea(attrs={**WIDGET, "rows": 3, "placeholder": "Ask your question..."}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["subcategory"].queryset = SubCategory.objects.filter(status="approved")
+        self.fields["subcategory"].queryset = SubCategory.objects.filter(
+            status="approved"
+        ).select_related("category__topic")
 
     def clean_title(self):
         title = self.cleaned_data["title"]
@@ -74,12 +126,26 @@ class QuestionForm(forms.ModelForm):
         return title
 
 
+class QuestionEditForm(forms.ModelForm):
+    class Meta:
+        model = Question
+        fields = ["subcategory", "title"]
+        widgets = {
+            "subcategory": forms.Select(attrs=SELECT),
+            "title": forms.Textarea(attrs={**WIDGET, "rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["subcategory"].queryset = SubCategory.objects.all().select_related("category__topic")
+
+
 class AnswerForm(forms.ModelForm):
     class Meta:
         model = Answer
         fields = ["content"]
         widgets = {
-            "content": forms.Textarea(attrs={"class": "form-control", "rows": 5, "placeholder": "Write your answer..."}),
+            "content": forms.Textarea(attrs={**WIDGET, "rows": 5, "placeholder": "Write your answer..."}),
         }
 
     def clean_content(self):
@@ -88,12 +154,21 @@ class AnswerForm(forms.ModelForm):
         return content
 
 
+class AnswerEditForm(forms.ModelForm):
+    class Meta:
+        model = Answer
+        fields = ["content"]
+        widgets = {
+            "content": forms.Textarea(attrs={**WIDGET, "rows": 5}),
+        }
+
+
 class AnswerPointForm(forms.ModelForm):
     class Meta:
         model = AnswerPoint
         fields = ["point"]
         widgets = {
-            "point": forms.Textarea(attrs={"class": "form-control", "rows": 2, "placeholder": "Add a key point..."}),
+            "point": forms.Textarea(attrs={**WIDGET, "rows": 2, "placeholder": "Add a key point..."}),
         }
 
 
@@ -108,8 +183,8 @@ class PDFUploadForm(forms.ModelForm):
     def clean_file(self):
         f = self.cleaned_data["file"]
         validate_pdf_extension(f)
-        if f.size > 10 * 1024 * 1024:
-            raise forms.ValidationError("File size must be under 10 MB.")
+        if f.size > 20 * 1024 * 1024:
+            raise forms.ValidationError("File size must be under 20 MB.")
         return f
 
 
@@ -123,3 +198,28 @@ class SearchForm(forms.Form):
             "autocomplete": "off",
         })
     )
+
+
+class ManualQuestionAnswerForm(forms.Form):
+    """For manually adding Q&A without duplicate detection."""
+    subcategory = forms.ModelChoiceField(
+        queryset=SubCategory.objects.filter(status="approved"),
+        widget=forms.Select(attrs={"class": "form-select"}),
+        label="Subcategory",
+    )
+    title = forms.CharField(
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 3,
+                                     "placeholder": "Question text..."}),
+        label="Question",
+    )
+    answer_content = forms.CharField(
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 5,
+                                     "placeholder": "Answer text..."}),
+        label="Answer",
+        required=False,
+    )
+
+    def clean_title(self):
+        title = self.cleaned_data["title"]
+        validate_question_length(title)
+        return title

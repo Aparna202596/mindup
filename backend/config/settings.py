@@ -134,16 +134,12 @@ SITE_ID = 2
 
 # Resolved warning conflicts: using email as the primary identification method
 ACCOUNT_LOGIN_METHODS = {"email"}
-ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
+ACCOUNT_SIGNUP_FIELDS = ["email*"]  # Only require email for signup
 # Disable username field and make email the unique identifier
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 # Registration adjustments
 ACCOUNT_EMAIL_VERIFICATION = "none"
 SOCIALACCOUNT_LOGIN_ON_GET = True
-
-# Flow Redirects
-LOGIN_REDIRECT_URL = "/"
-LOGOUT_REDIRECT_URL = "/"
 
 # Override admin login template
 LOGIN_REDIRECT_URL = "smart-login-redirect"  

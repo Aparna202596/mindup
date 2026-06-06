@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Add Question & Answer — MindUp{% endblock %}
+{% block content %}
+<div class="breadcrumb">
+  <a href="{% url 'home' %}">Home</a><span class="breadcrumb-sep">/</span>
+  <a href="{% url 'question-list' %}">Questions</a><span class="breadcrumb-sep">/</span>
+  <span class="breadcrumb-current">Add Manually</span>
+</div>
+
+<div class="card form-card">
+  <div class="card-header">Add Question & Answer Manually</div>
+  <div class="card-body">
+    <p class="text-muted text-sm mb-3">
+      This form bypasses duplicate detection. Use it to add Q&A pairs directly,
+      such as content from a PDF that wasn't auto-detected.
+    </p>
+    <form method="post">
+      {% csrf_token %}
+      {% for field in form %}
+        <div class="form-group">
+          <label>{{ field.label }}
+            {% if not field.field.required %}
+              <span class="label-hint">(optional)</span>
+            {% endif %}
+          </label>
+          {{ field }}
+          {% for err in field.errors %}
+            <div class="invalid-feedback">{{ err }}</div>
+          {% endfor %}
+        </div>
+      {% endfor %}
+      <div style="display:flex; gap:0.75rem; margin-top:1.5rem; flex-wrap:wrap;">
+        <button type="submit" class="btn btn-primary">Save Question & Answer</button>
+        <a href="{% url 'question-create' %}" class="btn btn-secondary">Use duplicate check instead</a>
+        <a href="{% url 'question-list' %}" class="btn btn-ghost">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

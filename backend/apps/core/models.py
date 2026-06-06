@@ -1,24 +1,21 @@
 import uuid
 from django.db import models
-
-class TimeStampedModel(models.Model):
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        abstract = True
-
-import uuid
-from django.db import models
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.contrib.postgres.search import SearchVectorField
 
+STATUS_CHOICES = [
+    ("pending", "Pending"),
+    ("approved", "Approved"),
+    ("rejected", "Rejected"),
+]
 
-# ─────────────────────────────────────────────
-# BASE
-# ─────────────────────────────────────────────
+PROCESSING_STATUS = [
+    ("pending", "Pending"),
+    ("processing", "Processing"),
+    ("completed", "Completed"),
+    ("failed", "Failed"),
+]
+
 
 class TimeStampedModel(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -28,10 +25,6 @@ class TimeStampedModel(models.Model):
     class Meta:
         abstract = True
 
-
-# ─────────────────────────────────────────────
-# USER
-# ─────────────────────────────────────────────
 
 class Role(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -80,17 +73,6 @@ class CustomUser(AbstractUser):
         return self.is_superuser or (self.role and self.role.name == "Admin")
 
 
-# ─────────────────────────────────────────────
-# CONTENT HIERARCHY
-# ─────────────────────────────────────────────
-
-STATUS_CHOICES = [
-    ("pending", "Pending"),
-    ("approved", "Approved"),
-    ("rejected", "Rejected"),
-]
-
-
 class Topic(TimeStampedModel):
     name = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True, null=True)
@@ -116,7 +98,7 @@ class Category(TimeStampedModel):
         indexes = [models.Index(fields=["name"])]
 
     def __str__(self):
-        return self.name
+        return f"{self.topic.name} → {self.name}"
 
 
 class SubCategory(TimeStampedModel):
@@ -129,7 +111,7 @@ class SubCategory(TimeStampedModel):
         unique_together = ("category", "name")
 
     def __str__(self):
-        return self.name
+        return f"{self.category.name} → {self.name}"
 
 
 class Question(TimeStampedModel):
@@ -167,18 +149,6 @@ class AnswerPoint(TimeStampedModel):
         return self.point[:50]
 
 
-# ─────────────────────────────────────────────
-# UPLOADS
-# ─────────────────────────────────────────────
-
-PROCESSING_STATUS = [
-    ("pending", "Pending"),
-    ("processing", "Processing"),
-    ("completed", "Completed"),
-    ("failed", "Failed"),
-]
-
-
 class PDFUpload(TimeStampedModel):
     file = models.FileField(upload_to="pdfs/")
     uploaded_by = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="uploads")
@@ -189,10 +159,6 @@ class PDFUpload(TimeStampedModel):
         return f"{self.uploaded_by.email} — {self.process_status}"
 
 
-# ─────────────────────────────────────────────
-# APPROVALS
-# ─────────────────────────────────────────────
-
 class ApprovalQueue(TimeStampedModel):
     OBJECT_TYPES = [
         ("topic", "Topic"),
@@ -202,7 +168,7 @@ class ApprovalQueue(TimeStampedModel):
     object_type = models.CharField(max_length=50, choices=OBJECT_TYPES)
     object_id = models.UUIDField()
     requested_by = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="approval_requests")
-    is_approved = models.BooleanField(null=True, blank=True)  # None=pending
+    is_approved = models.BooleanField(null=True, blank=True)
     reviewed_by = models.ForeignKey(
         CustomUser, on_delete=models.SET_NULL,
         null=True, blank=True, related_name="reviews"
@@ -213,10 +179,6 @@ class ApprovalQueue(TimeStampedModel):
         return f"{self.object_type} — {self.requested_by.email}"
 
 
-# ─────────────────────────────────────────────
-# NOTIFICATIONS
-# ─────────────────────────────────────────────
-
 class Notification(TimeStampedModel):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="notifications")
     title = models.CharField(max_length=255)
@@ -226,10 +188,6 @@ class Notification(TimeStampedModel):
     def __str__(self):
         return f"{self.user.email} — {self.title}"
 
-
-# ─────────────────────────────────────────────
-# AUDIT LOG
-# ─────────────────────────────────────────────
 
 class AuditLog(TimeStampedModel):
     user = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, related_name="audit_logs")

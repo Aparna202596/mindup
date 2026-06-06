@@ -7,7 +7,8 @@
     <h1 class="page-title">Admin Dashboard</h1>
     <p class="page-subtitle">System overview and content management</p>
   </div>
-  <div style="display:flex; gap:0.5rem;">
+  <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+    <a href="{% url 'admin-content' %}" class="btn btn-primary">Manage Content</a>
     <a href="{% url 'audit-log' %}" class="btn btn-secondary">Audit Log</a>
     <a href="{% url 'user-list' %}" class="btn btn-secondary">Users</a>
     <a href="{% url 'admin:index' %}" class="btn btn-outline">Django Admin</a>
