@@ -193,3 +193,22 @@ SOCIALACCOUNT_PROVIDERS = {
         }
     }
 }
+
+# ==============================================================================
+# 13. CELERY CONFIGURATION
+# ==============================================================================
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://127.0.0.1:6379/0")
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://127.0.0.1:6379/0")
+
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    'redis_version_check': False,
+    'sep_by_sub': False,
+    'protocol': 2
+}
+
+# CELERY_BROKER_TRANSPORT_OPTIONS = {
+#     'protocol': 2
+# }
+# CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {
+#     'protocol': 2
+# }
