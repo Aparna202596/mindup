@@ -479,7 +479,6 @@ def answer_point_create_view(request, answer_pk):
 
 
 # ── PDF UPLOAD ────────────────────────────────────────────────────────────────
-
 @login_required
 def pdf_upload_view(request):
     form = PDFUploadForm(request.POST or None, request.FILES or None)
@@ -487,12 +486,21 @@ def pdf_upload_view(request):
         upload = form.save(commit=False)
         upload.uploaded_by = request.user
         upload.save()
-        from apps.core.services.pdf_processor import process_pdf
-        report = process_pdf(str(upload.id))
-        q_count = report.get("questions_created", 0)
-        messages.success(request,
-            f"PDF processed: {q_count} question(s) extracted. "
-            f"Check upload history for the full report.")
+
+        try:
+            from apps.core.tasks import process_pdf_task
+            process_pdf_task.delay(str(upload.id))
+            messages.success(
+                request,
+                "PDF uploaded successfully. Processing has started in the background. "
+                "Check Upload History for results."
+            )
+        except Exception:
+            from apps.core.services.pdf_processor import process_pdf
+            report = process_pdf(str(upload.id))
+            q = report.get("questions_created", 0)
+            messages.success(request, f"PDF processed: {q} question(s) extracted.")
+
         return redirect("upload-history")
     return render(request, "uploads/pdf_upload.html", {"form": form})
 

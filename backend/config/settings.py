@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 from django.contrib.messages import constants as messages
 from decouple import config
+from celery.schedules import crontab
 # ==============================================================================
 # 1. INITIALIZATION & CORE PATHS
 # ==============================================================================
@@ -212,3 +213,77 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
 # CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {
 #     'protocol': 2
 # }
+
+# ==============================================================================
+# 14. CELERY BEAT (Periodic Tasks)
+# ==============================================================================
+
+CELERY_BEAT_SCHEDULE = {
+    "cleanup-old-notifications": {
+        "task": "apps.core.tasks.cleanup_old_notifications_task",
+        "schedule": crontab(hour=2, minute=0),   # daily at 2am
+    },
+    "update-search-vectors": {
+        "task": "apps.core.tasks.update_search_vectors_task",
+        "schedule": crontab(minute="*/30"),       # every 30 minutes
+    },
+}
+
+CELERY_TIMEZONE = "UTC"
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 300   # 5 min max per task
+CELERY_TASK_SOFT_TIME_LIMIT = 240
+
+# ==============================================================================
+# 15. LOGGING
+# ==============================================================================
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
+            "style": "{",
+        },
+        "simple": {
+            "format": "{levelname} {asctime} {module} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "file_app": {
+            "level": "INFO",
+            "class": "logging.FileHandler",
+            "filename": BASE_DIR / "logs" / "app.log",
+            "formatter": "verbose",
+        },
+        "file_error": {
+            "level": "ERROR",
+            "class": "logging.FileHandler",
+            "filename": BASE_DIR / "logs" / "error.log",
+            "formatter": "verbose",
+        },
+        "console": {
+            "level": "DEBUG",
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+        },
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console", "file_error"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "apps": {
+            "handlers": ["console", "file_app", "file_error"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "celery": {
+            "handlers": ["console", "file_app"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}
