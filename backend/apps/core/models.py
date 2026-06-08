@@ -164,6 +164,9 @@ class ApprovalQueue(TimeStampedModel):
         ("topic", "Topic"),
         ("category", "Category"),
         ("subcategory", "SubCategory"),
+        ("pdf_upload",  "PDF Upload"),
+        ("question", "Question"),
+        ("answer", "Answer"),
     ]
     object_type = models.CharField(max_length=50, choices=OBJECT_TYPES)
     object_id = models.UUIDField()

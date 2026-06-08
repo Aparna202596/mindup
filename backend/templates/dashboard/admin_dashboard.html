@@ -1,20 +1,20 @@
 {% extends "base.html" %}
 {% block title %}Admin Dashboard — MindUp{% endblock %}
-{% block content %}
 
+{% block content %}
 <div class="flex-between mb-3">
   <div>
     <h1 class="page-title">Admin Dashboard</h1>
-    <p class="page-subtitle">System overview and content management</p>
+    <p class="page-subtitle">System overview · Approvals · Content Management</p>
   </div>
   <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-    <a href="{% url 'admin-content' %}" class="btn btn-primary">Manage Content</a>
-    <a href="{% url 'audit-log' %}" class="btn btn-secondary">Audit Log</a>
-    <a href="{% url 'user-list' %}" class="btn btn-secondary">Users</a>
+    <a href="{% url 'audit-log' %}"   class="btn btn-secondary">Audit Log</a>
+    <a href="{% url 'user-list' %}"   class="btn btn-secondary">Users</a>
     <a href="{% url 'admin:index' %}" class="btn btn-outline">Django Admin</a>
   </div>
 </div>
 
+{# ── STATS GRID ──────────────────────────────────────────────────────────── #}
 <div class="stats-grid">
   <div class="stat-card">
     <div class="stat-number">{{ stats.users }}</div>
@@ -52,14 +52,15 @@
   </div>
 </div>
 
-<div style="display:grid; grid-template-columns:1fr 1fr; gap:2rem; align-items:start;">
+{# ── TOP ROW: Approval Queue + Most Viewed ────────────────────────────────── #}
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:2rem; align-items:start; margin-bottom:2rem;">
 
+  {# Approval Queue #}
   <div>
     <div class="section-header">
       <h2 class="section-title">Approval Queue</h2>
       <span class="badge badge-pending">{{ pending|length }} pending</span>
     </div>
-
     {% if pending %}
     <div class="card">
       <div class="table-wrapper">
@@ -76,8 +77,8 @@
               <td>
                 <form method="post" action="{% url 'approve-item' item.pk %}" class="approve-btn-group">
                   {% csrf_token %}
-                  <button name="action" value="approve" class="btn btn-sm btn-success">✓ Approve</button>
-                  <button name="action" value="reject"  class="btn btn-sm btn-danger">✗ Reject</button>
+                  <button name="action" value="approve" class="btn btn-sm btn-success">✓</button>
+                  <button name="action" value="reject"  class="btn btn-sm btn-danger">✗</button>
                 </form>
               </td>
             </tr>
@@ -87,18 +88,15 @@
       </div>
     </div>
     {% else %}
-    <div class="empty-state" style="padding:2rem;">
-      <p>No pending approvals ✓</p>
-    </div>
+    <div class="empty-state" style="padding:2rem;"><p>No pending approvals ✓</p></div>
     {% endif %}
   </div>
 
+  {# Most Viewed Questions + Recent Uploads #}
   <div>
-    <div class="section-header">
-      <h2 class="section-title">Most Viewed Questions</h2>
-    </div>
+    <div class="section-header"><h2 class="section-title">Most Viewed Questions</h2></div>
     {% if stats.most_viewed %}
-    <div style="display:flex; flex-direction:column; gap:0.625rem;">
+    <div style="display:flex; flex-direction:column; gap:0.625rem; margin-bottom:1.5rem;">
       {% for q in stats.most_viewed %}
       <a href="{% url 'question-detail' q.pk %}" class="question-card" style="text-decoration:none;">
         <div class="topic-card-title" style="font-size:0.9rem;">{{ q.title|truncatechars:90 }}</div>
@@ -107,12 +105,10 @@
       {% endfor %}
     </div>
     {% else %}
-    <div class="empty-state" style="padding:2rem;"><p>No questions yet.</p></div>
+    <div class="empty-state" style="padding:1rem; margin-bottom:1.5rem;"><p>No questions yet.</p></div>
     {% endif %}
 
-    <div class="section-header mt-3">
-      <h2 class="section-title">Recent Uploads</h2>
-    </div>
+    <div class="section-header"><h2 class="section-title">Recent PDF Uploads</h2></div>
     {% with uploads=stats.recent_uploads %}
     {% if uploads %}
     <div class="card">
@@ -132,10 +128,155 @@
       </div>
     </div>
     {% else %}
-    <div class="empty-state" style="padding:2rem;"><p>No uploads yet.</p></div>
+    <div class="empty-state" style="padding:1rem;"><p>No uploads yet.</p></div>
     {% endif %}
     {% endwith %}
   </div>
-
 </div>
+
+{# ── CONTENT MANAGEMENT TABS ──────────────────────────────────────────────── #}
+<div class="flex-between mb-2">
+  <h2 class="section-title" style="margin:0;">Content Management</h2>
+  <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+    {% if tab == "topics" %}
+      <a href="{% url 'topic-create' %}"     class="btn btn-primary btn-sm">+ New Topic</a>
+    {% elif tab == "categories" %}
+      <a href="{% url 'category-create' %}"  class="btn btn-primary btn-sm">+ New Category</a>
+    {% elif tab == "subcategories" %}
+      <a href="{% url 'subcategory-create' %}" class="btn btn-primary btn-sm">+ New Subcategory</a>
+    {% elif tab == "questions" %}
+      <a href="{% url 'question-create' %}"  class="btn btn-primary btn-sm">+ Ask Question</a>
+      <a href="{% url 'manual-qa-create' %}" class="btn btn-secondary btn-sm">+ Manual Q&A</a>
+    {% endif %}
+  </div>
+</div>
+
+{# Tab nav #}
+<div style="display:flex; gap:0.25rem; border-bottom:1px solid var(--border); margin-bottom:1.25rem;">
+  {% for t, label in tab_list %}
+  <a href="?tab={{ t }}"
+     style="padding:0.5rem 1rem; border-radius:var(--radius) var(--radius) 0 0;
+            font-size:0.875rem; font-weight:500; text-decoration:none;
+            border:1px solid {% if tab == t %}var(--border){% else %}transparent{% endif %};
+            border-bottom:{% if tab == t %}1px solid var(--surface){% else %}none{% endif %};
+            background:{% if tab == t %}var(--surface){% else %}transparent{% endif %};
+            color:{% if tab == t %}var(--primary){% else %}var(--text-muted){% endif %};
+            margin-bottom:-1px;">
+    {{ label }}
+  </a>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          {% if tab == "topics" %}
+            <th>Name</th><th>Status</th><th>Created by</th><th>Date</th><th>Actions</th>
+          {% elif tab == "categories" %}
+            <th>Topic</th><th>Name</th><th>Status</th><th>Date</th><th>Actions</th>
+          {% elif tab == "subcategories" %}
+            <th>Category</th><th>Name</th><th>Status</th><th>Date</th><th>Actions</th>
+          {% elif tab == "questions" %}
+            <th>Question</th><th>Subcategory</th><th>Views</th><th>Date</th><th>Actions</th>
+          {% elif tab == "answers" %}
+            <th>Question</th><th>Answer (preview)</th><th>By</th><th>Date</th><th>Actions</th>
+          {% elif tab == "uploads" %}
+            <th>User</th><th>File</th><th>Status</th><th>Report</th><th>Date</th>
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          {% if tab == "topics" %}
+            <td style="font-weight:500;">{{ item.name }}</td>
+            <td><span class="badge badge-{{ item.status }}">{{ item.status }}</span></td>
+            <td class="text-sm">{{ item.created_by.email }}</td>
+            <td class="text-sm text-muted">{{ item.created_at|date:"M d, Y" }}</td>
+            <td>
+              <div style="display:flex; gap:0.375rem;">
+                <a href="{% url 'topic-edit' item.pk %}"   class="btn btn-sm btn-secondary">Edit</a>
+                <a href="{% url 'topic-delete' item.pk %}" class="btn btn-sm btn-danger">Delete</a>
+              </div>
+            </td>
+
+          {% elif tab == "categories" %}
+            <td class="text-sm text-muted">{{ item.topic.name }}</td>
+            <td style="font-weight:500;">{{ item.name }}</td>
+            <td><span class="badge badge-{{ item.status }}">{{ item.status }}</span></td>
+            <td class="text-sm text-muted">{{ item.created_at|date:"M d, Y" }}</td>
+            <td>
+              <div style="display:flex; gap:0.375rem;">
+                <a href="{% url 'category-edit' item.pk %}"   class="btn btn-sm btn-secondary">Edit</a>
+                <a href="{% url 'category-delete' item.pk %}" class="btn btn-sm btn-danger">Delete</a>
+              </div>
+            </td>
+
+          {% elif tab == "subcategories" %}
+            <td class="text-sm text-muted">{{ item.category.name }}</td>
+            <td style="font-weight:500;">{{ item.name }}</td>
+            <td><span class="badge badge-{{ item.status }}">{{ item.status }}</span></td>
+            <td class="text-sm text-muted">{{ item.created_at|date:"M d, Y" }}</td>
+            <td>
+              <div style="display:flex; gap:0.375rem;">
+                <a href="{% url 'subcategory-edit' item.pk %}"   class="btn btn-sm btn-secondary">Edit</a>
+                <a href="{% url 'subcategory-delete' item.pk %}" class="btn btn-sm btn-danger">Delete</a>
+              </div>
+            </td>
+
+          {% elif tab == "questions" %}
+            <td style="font-weight:500; max-width:320px;">
+              <a href="{% url 'question-detail' item.pk %}">{{ item.title|truncatechars:80 }}</a>
+            </td>
+            <td class="text-sm text-muted">{{ item.subcategory.name }}</td>
+            <td class="text-sm">{{ item.view_count }}</td>
+            <td class="text-sm text-muted">{{ item.created_at|date:"M d, Y" }}</td>
+            <td>
+              <div style="display:flex; gap:0.375rem;">
+                <a href="{% url 'question-edit' item.pk %}"   class="btn btn-sm btn-secondary">Edit</a>
+                <a href="{% url 'question-delete' item.pk %}" class="btn btn-sm btn-danger">Delete</a>
+              </div>
+            </td>
+
+          {% elif tab == "answers" %}
+            <td class="text-sm" style="max-width:200px;">
+              <a href="{% url 'question-detail' item.question.pk %}">{{ item.question.title|truncatechars:50 }}</a>
+            </td>
+            <td class="text-sm" style="max-width:260px;">{{ item.content|truncatechars:80 }}</td>
+            <td class="text-sm text-muted">{{ item.created_by.email }}</td>
+            <td class="text-sm text-muted">{{ item.created_at|date:"M d, Y" }}</td>
+            <td>
+              <div style="display:flex; gap:0.375rem;">
+                <a href="{% url 'answer-edit' item.pk %}"   class="btn btn-sm btn-secondary">Edit</a>
+                <a href="{% url 'answer-delete' item.pk %}" class="btn btn-sm btn-danger">Delete</a>
+              </div>
+            </td>
+
+          {% elif tab == "uploads" %}
+            <td class="text-sm">{{ item.uploaded_by.email }}</td>
+            <td class="text-sm text-muted" style="max-width:180px; word-break:break-all;">
+              {{ item.file.name|cut:"pdfs/" }}
+            </td>
+            <td><span class="badge badge-{{ item.process_status }}">{{ item.get_process_status_display }}</span></td>
+            <td class="text-sm" style="max-width:260px; white-space:pre-wrap; font-family:monospace; font-size:0.75rem;">
+              {{ item.processing_report|default:"—" }}
+            </td>
+            <td class="text-sm text-muted">{{ item.created_at|date:"M d, Y H:i" }}</td>
+
+          {% endif %}
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" style="text-align:center; padding:2rem; color:var(--text-muted);">
+            No {{ tab }} found.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
 {% endblock %}

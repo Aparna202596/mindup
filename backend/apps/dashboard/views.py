@@ -1,23 +1,63 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.admin.views.decorators import staff_member_required
 from django.utils import timezone
 from django.contrib import messages
 
 from apps.dashboard.services.dashboard_services import get_dashboard_stats
-from apps.core.models import ApprovalQueue, Topic, Category, SubCategory
+from apps.core.models import ApprovalQueue, Topic, Category, SubCategory, PDFUpload
+from apps.core.models import Question, Answer
 from apps.core.services.notification_service import create_notification
 from apps.core.services.audit_service import create_audit_log
 from apps.core.permissions import admin_required
 
 
+TAB_LIST = [
+    ("topics",        "Topics"),
+    ("categories",    "Categories"),
+    ("subcategories", "Subcategories"),
+    ("questions",     "Questions"),
+    ("answers",       "Answers"),
+    ("uploads",       "PDF Uploads"),
+]
+
+
 @admin_required
 def admin_dashboard(request):
-    stats   = get_dashboard_stats()
-    pending = ApprovalQueue.objects.filter(
-        is_approved__isnull=True
-    ).select_related("requested_by").order_by("-created_at")
+    stats = get_dashboard_stats()
+
+    # All pending approval queue items (topics/categories/subcategories + pdf uploads)
+    pending = (
+        ApprovalQueue.objects
+        .filter(is_approved__isnull=True)
+        .select_related("requested_by")
+        .order_by("-created_at")
+    )
+
+    # ── Content tab data ───────────────────────────────────────────────────────
+    tab = request.GET.get("tab", "topics")
+
+    if tab == "topics":
+        items = Topic.objects.order_by("-created_at")
+    elif tab == "categories":
+        items = Category.objects.select_related("topic").order_by("-created_at")
+    elif tab == "subcategories":
+        items = SubCategory.objects.select_related("category__topic").order_by("-created_at")
+    elif tab == "questions":
+        items = Question.objects.select_related(
+            "subcategory__category__topic", "created_by"
+        ).order_by("-created_at")
+    elif tab == "answers":
+        items = Answer.objects.select_related("question", "created_by").order_by("-created_at")
+    elif tab == "uploads":
+        items = PDFUpload.objects.select_related("uploaded_by").order_by("-created_at")
+    else:
+        items = []
+
     return render(request, "dashboard/admin_dashboard.html", {
-        "stats": stats, "pending": pending,
+        "stats":    stats,
+        "pending":  pending,
+        "tab":      tab,
+        "tab_list": TAB_LIST,
+        "items":    items,
     })
 
 
@@ -57,14 +97,36 @@ def approve_item(request, pk):
         )
         messages.warning(request, f"{item.object_type.title()} rejected.")
 
-    item.reviewed_by  = request.user
-    item.reviewed_at  = timezone.now()
+    item.reviewed_by = request.user
+    item.reviewed_at = timezone.now()
     item.save()
+
     return redirect("admin-dashboard")
 
 
+# def _set_status(item, status):
+#     model_map = {
+#         "topic":       Topic,
+#         "category":    Category,
+#         "subcategory": SubCategory,
+#         "pdf_upload":  PDFUpload, 
+#         "question":    Question,
+#         "answer":      Answer,
+#     }
+#     Model = model_map.get(item.object_type)
+#     if Model:
+#         Model.objects.filter(pk=item.object_id).update(status=status)
+
 def _set_status(item, status):
-    model_map = {"topic": Topic, "category": Category, "subcategory": SubCategory}
-    Model = model_map.get(item.object_type)
-    if Model:
-        Model.objects.filter(pk=item.object_id).update(status=status)
+    model_map = {
+        "topic":       (Topic,      "status"),
+        "category":    (Category,   "status"),
+        "subcategory": (SubCategory,"status"),
+        "pdf_upload":  (PDFUpload,  "process_status"),  
+        "question":    (Question,   "status"),
+        "answer":      (Answer,     "status"),
+    }
+    entry = model_map.get(item.object_type)
+    if entry:
+        Model, field = entry
+        Model.objects.filter(pk=item.object_id).update(**{field: status})

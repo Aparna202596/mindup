@@ -10,7 +10,11 @@
 </head>
 <body class="page-wrapper">
 
-{% include "includes/navbar.html" %}
+{% if user.is_authenticated and user.is_admin %}
+  {% include "includes/admin_navbar.html" %}
+{% else %}
+  {% include "includes/navbar.html" %}
+{% endif %}
 
 <main class="main-content">
   <div class="container">

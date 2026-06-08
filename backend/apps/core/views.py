@@ -11,7 +11,7 @@ from django.utils import timezone
 
 from apps.core.models import (
     Topic, Category, SubCategory, Question,
-    Answer, AnswerPoint, PDFUpload, Notification, AuditLog,
+    Answer, AnswerPoint, PDFUpload, Notification, AuditLog, ApprovalQueue,
 )
 from apps.core.forms import (
     TopicForm, TopicEditForm,
@@ -26,6 +26,7 @@ from apps.core.forms import (
 from apps.core.services.question_service import create_question
 from apps.core.services.search_service import global_search
 from apps.core.services.audit_service import create_audit_log
+from apps.core.services.duplicate_detector import is_duplicate_answer
 from apps.core.permissions import admin_required
 
 
@@ -121,10 +122,10 @@ def topic_edit(request, pk):
                          object_id=topic.id, old_data=old,
                          new_data={"name": topic.name, "status": topic.status})
         messages.success(request, "Topic updated.")
-        return redirect("admin-content")
+        return redirect("admin-dashboard")
     return render(request, "dashboard/edit_form.html", {
         "form": form, "title": "Edit Topic", "object": topic,
-        "cancel_url": "admin-content",
+        "cancel_url": "admin-dashboard",
     })
 
 
@@ -136,9 +137,10 @@ def topic_delete(request, pk):
                          object_id=topic.id, old_data={"name": topic.name})
         topic.delete()
         messages.success(request, "Topic deleted.")
-        return redirect("admin-content")
-    return render(request, "confirm_delete.html", {"object": topic, "type": "Topic",
-                                                    "cancel_url": "admin-content"})
+        return redirect("admin-dashboard")
+    return render(request, "confirm_delete.html", {
+        "object": topic, "type": "Topic", "cancel_url": "admin-dashboard",
+    })
 
 
 # ── CATEGORIES ────────────────────────────────────────────────────────────────
@@ -187,10 +189,10 @@ def category_edit(request, pk):
                          object_id=cat.id, old_data=old,
                          new_data={"name": cat.name, "status": cat.status})
         messages.success(request, "Category updated.")
-        return redirect("admin-content")
+        return redirect("admin-dashboard")
     return render(request, "dashboard/edit_form.html", {
         "form": form, "title": "Edit Category", "object": cat,
-        "cancel_url": "admin-content",
+        "cancel_url": "admin-dashboard",
     })
 
 
@@ -202,9 +204,10 @@ def category_delete(request, pk):
                          object_id=cat.id, old_data={"name": cat.name})
         cat.delete()
         messages.success(request, "Category deleted.")
-        return redirect("admin-content")
-    return render(request, "confirm_delete.html", {"object": cat, "type": "Category",
-                                                    "cancel_url": "admin-content"})
+        return redirect("admin-dashboard")
+    return render(request, "confirm_delete.html", {
+        "object": cat, "type": "Category", "cancel_url": "admin-dashboard",
+    })
 
 
 # ── SUBCATEGORIES ─────────────────────────────────────────────────────────────
@@ -222,15 +225,9 @@ class SubCategoryDetailView(DetailView):
 
 @login_required
 def subcategory_create(request, category_pk=None):
-    """
-    Works two ways:
-      /subcategories/create/                 → blank form
-      /categories/<pk>/add-subcategory/      → pre-selects the category
-    """
     category = None
     if category_pk:
         category = get_object_or_404(Category, pk=category_pk, status="approved")
-
     form = SubCategoryForm(request.POST or None,
                            category_pk=str(category.pk) if category else None)
     if request.method == "POST" and form.is_valid():
@@ -241,7 +238,6 @@ def subcategory_create(request, category_pk=None):
         if category:
             return redirect("category-detail", pk=category.pk)
         return redirect("category-list")
-
     return render(request, "categories/subcategory_create.html", {
         "form": form,
         "preselected_category": category,
@@ -259,10 +255,10 @@ def subcategory_edit(request, pk):
                          object_id=sub.id, old_data=old,
                          new_data={"name": sub.name, "status": sub.status})
         messages.success(request, "Subcategory updated.")
-        return redirect("admin-content")
+        return redirect("admin-dashboard")
     return render(request, "dashboard/edit_form.html", {
         "form": form, "title": "Edit Subcategory", "object": sub,
-        "cancel_url": "admin-content",
+        "cancel_url": "admin-dashboard",
     })
 
 
@@ -274,9 +270,10 @@ def subcategory_delete(request, pk):
                          object_id=sub.id, old_data={"name": sub.name})
         sub.delete()
         messages.success(request, "Subcategory deleted.")
-        return redirect("admin-content")
-    return render(request, "confirm_delete.html", {"object": sub, "type": "Subcategory",
-                                                    "cancel_url": "admin-content"})
+        return redirect("admin-dashboard")
+    return render(request, "confirm_delete.html", {
+        "object": sub, "type": "Subcategory", "cancel_url": "admin-dashboard",
+    })
 
 
 # ── QUESTIONS ─────────────────────────────────────────────────────────────────
@@ -316,6 +313,7 @@ class QuestionDetailView(DetailView):
         ctx = super().get_context_data(**kwargs)
         ctx["answers"]     = self.object.answers.prefetch_related("points").select_related("created_by")
         ctx["answer_form"] = AnswerForm()
+        ctx["point_form"]  = AnswerPointForm()
         return ctx
 
 
@@ -345,12 +343,13 @@ def question_create_view(request):
 
 @login_required
 def manual_qa_create(request):
-    """Add a question + answer together, skipping duplicate detection."""
+    """Add a Q&A pair together. Answer points entered one per line prefixed with • or -."""
     form = ManualQuestionAnswerForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         from apps.core.services.duplicate_detector import normalize_question
-        title = form.cleaned_data["title"]
-        subcategory = form.cleaned_data["subcategory"]
+
+        title          = form.cleaned_data["title"]
+        subcategory    = form.cleaned_data["subcategory"]
         answer_content = form.cleaned_data.get("answer_content", "").strip()
 
         question = Question.objects.create(
@@ -363,16 +362,48 @@ def manual_qa_create(request):
                          object_id=question.id, new_data={"title": title})
 
         if answer_content:
-            Answer.objects.create(
-                question=question,
-                content=answer_content,
-                created_by=request.user,
-            )
+            # Split into bullets (lines starting with ·, •, -, *)
+            # and a plain prose block (everything else)
+            bullet_pat   = re.compile(r'^\s*[·•\-\*]\s*(.+)')
+            bullet_lines = []
+            prose_lines  = []
+
+            for line in answer_content.splitlines():
+                m = bullet_pat.match(line)
+                if m:
+                    bullet_lines.append(m.group(1).strip())
+                elif line.strip():
+                    prose_lines.append(line.strip())
+
+            prose_text = " ".join(prose_lines).strip()
+
+            if bullet_lines:
+                answer = Answer.objects.create(
+                    question=question,
+                    content=prose_text or "See key points below.",
+                    created_by=request.user,
+                )
+                for pt in bullet_lines:
+                    AnswerPoint.objects.create(
+                        answer=answer,
+                        point=pt,
+                        created_by=request.user,
+                    )
+            elif prose_text:
+                Answer.objects.create(
+                    question=question,
+                    content=prose_text,
+                    created_by=request.user,
+                )
 
         messages.success(request, "Question and answer saved successfully.")
         return redirect("question-detail", pk=question.pk)
 
     return render(request, "questions/manual_qa_create.html", {"form": form})
+
+
+# keep re import accessible inside the view above
+import re
 
 
 @admin_required
@@ -392,7 +423,6 @@ def question_edit(request, pk):
         return redirect("question-detail", pk=question.pk)
     return render(request, "dashboard/edit_form.html", {
         "form": form, "title": "Edit Question", "object": question,
-        "cancel_url": None,
         "cancel_href": f"/questions/{question.pk}/",
     })
 
@@ -418,15 +448,25 @@ def question_delete(request, pk):
 def answer_create_view(request, question_pk):
     question = get_object_or_404(Question, pk=question_pk)
     form = AnswerForm(request.POST or None)
+
     if request.method == "POST" and form.is_valid():
+        content = form.cleaned_data["content"]
+
+        # Duplicate answer check
+        if is_duplicate_answer(content, question_pk):
+            messages.warning(request, "A very similar answer already exists for this question.")
+            return render(request, "answers/answer_create.html", {"form": form, "question": question})
+
         answer = form.save(commit=False)
         answer.question   = question
         answer.created_by = request.user
         answer.save()
+
         create_audit_log(user=request.user, action="CREATE", object_type="Answer",
                          object_id=answer.id, new_data={"question": str(question.id)})
         messages.success(request, "Answer posted.")
         return redirect("question-detail", pk=question.pk)
+
     return render(request, "answers/answer_create.html", {"form": form, "question": question})
 
 
@@ -479,6 +519,7 @@ def answer_point_create_view(request, answer_pk):
 
 
 # ── PDF UPLOAD ────────────────────────────────────────────────────────────────
+
 @login_required
 def pdf_upload_view(request):
     form = PDFUploadForm(request.POST or None, request.FILES or None)
@@ -487,21 +528,35 @@ def pdf_upload_view(request):
         upload.uploaded_by = request.user
         upload.save()
 
+        # ── Create approval queue entry so admin can see the upload ──────────
+        # (object_type "pdf_upload" – admin dashboard filters on this)
+        ApprovalQueue.objects.create(
+            object_type="pdf_upload",
+            object_id=upload.id,
+            requested_by=request.user,
+        )
+
+        # ── Process PDF ───────────────────────────────────────────────────────
         try:
             from apps.core.tasks import process_pdf_task
             process_pdf_task.delay(str(upload.id))
             messages.success(
                 request,
-                "PDF uploaded successfully. Processing has started in the background. "
+                "PDF uploaded. Processing started in background. "
                 "Check Upload History for results."
             )
         except Exception:
             from apps.core.services.pdf_processor import process_pdf
             report = process_pdf(str(upload.id))
             q = report.get("questions_created", 0)
-            messages.success(request, f"PDF processed: {q} question(s) extracted.")
+            a = report.get("answers_created", 0)
+            messages.success(
+                request,
+                f"PDF processed: {q} question(s) and {a} answer(s) extracted."
+            )
 
         return redirect("upload-history")
+
     return render(request, "uploads/pdf_upload.html", {"form": form})
 
 
@@ -515,6 +570,10 @@ def upload_history_view(request):
 
 @login_required
 def user_dashboard(request):
+    """Only shown to non-admin users."""
+    if request.user.is_admin:
+        return redirect("admin-dashboard")
+
     user = request.user
     notification_qs = Notification.objects.filter(user=user)
     return render(request, "dashboard/user_dashboard.html", {
@@ -561,39 +620,13 @@ def audit_log_view(request):
     })
 
 
-# ── CONTENT MANAGEMENT (admin) ────────────────────────────────────────────────
+# ── CONTENT MANAGEMENT (admin) — kept as alias for admin-dashboard tab ────────
 
 @admin_required
 def admin_content_view(request):
-    """Single page showing all content with edit/delete controls."""
+    """Redirect to admin dashboard with the correct tab."""
     tab = request.GET.get("tab", "topics")
-    context = {
-        "tab": tab,
-        "tab_list": [
-            ("topics", "Topics"),
-            ("categories", "Categories"),
-            ("subcategories", "Subcategories"),
-            ("questions", "Questions"),
-            ("answers", "Answers"),
-        ],
-    }
-
-    if tab == "topics":
-        context["items"] = Topic.objects.order_by("-created_at")
-    elif tab == "categories":
-        context["items"] = Category.objects.select_related("topic").order_by("-created_at")
-    elif tab == "subcategories":
-        context["items"] = SubCategory.objects.select_related("category__topic").order_by("-created_at")
-    elif tab == "questions":
-        context["items"] = Question.objects.select_related(
-            "subcategory__category__topic", "created_by"
-        ).order_by("-created_at")
-    elif tab == "answers":
-        context["items"] = Answer.objects.select_related(
-            "question", "created_by"
-        ).order_by("-created_at")
-
-    return render(request, "dashboard/admin_content.html", context)
+    return redirect(f"/admin-dashboard/?tab={tab}")
 
 
 # ── USER MANAGEMENT ───────────────────────────────────────────────────────────
