@@ -16,7 +16,7 @@ PROCESSING_STATUS = [
     ("failed", "Failed"),
 ]
 
-
+# 
 class TimeStampedModel(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -25,7 +25,7 @@ class TimeStampedModel(models.Model):
     class Meta:
         abstract = True
 
-
+# USER ROLES
 class Role(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=50, unique=True)
@@ -33,7 +33,7 @@ class Role(models.Model):
     def __str__(self):
         return self.name
 
-
+# CUSTOM USER MODEL
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
         if not email:
@@ -72,7 +72,7 @@ class CustomUser(AbstractUser):
     def is_admin(self):
         return self.is_superuser or (self.role and self.role.name == "Admin")
 
-
+# CORE MODELS
 class Topic(TimeStampedModel):
     name = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True, null=True)
@@ -84,7 +84,6 @@ class Topic(TimeStampedModel):
 
     def __str__(self):
         return self.name
-
 
 class Category(TimeStampedModel):
     topic = models.ForeignKey(Topic, on_delete=models.CASCADE, related_name="categories")
@@ -100,7 +99,6 @@ class Category(TimeStampedModel):
     def __str__(self):
         return f"{self.topic.name} → {self.name}"
 
-
 class SubCategory(TimeStampedModel):
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="subcategories")
     name = models.CharField(max_length=255)
@@ -113,7 +111,6 @@ class SubCategory(TimeStampedModel):
     def __str__(self):
         return f"{self.category.name} → {self.name}"
 
-
 class Question(TimeStampedModel):
     subcategory = models.ForeignKey(SubCategory, on_delete=models.CASCADE, related_name="questions")
     title = models.TextField()
@@ -123,11 +120,12 @@ class Question(TimeStampedModel):
     view_count = models.PositiveIntegerField(default=0)
 
     class Meta:
-        indexes = [models.Index(fields=["normalized_title"])]
+        permissions = [
+            ("bulk_upload_question", "Can perform bulk Q&A upload"),
+        ]
 
     def __str__(self):
         return self.title[:80]
-
 
 class Answer(TimeStampedModel):
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name="answers")
@@ -139,7 +137,6 @@ class Answer(TimeStampedModel):
     def __str__(self):
         return self.content[:50]
 
-
 class AnswerPoint(TimeStampedModel):
     answer = models.ForeignKey(Answer, on_delete=models.CASCADE, related_name="points")
     point = models.TextField()
@@ -148,25 +145,32 @@ class AnswerPoint(TimeStampedModel):
     def __str__(self):
         return self.point[:50]
 
-
-class PDFUpload(TimeStampedModel):
-    file = models.FileField(upload_to="pdfs/")
-    uploaded_by = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="uploads")
-    process_status = models.CharField(max_length=20, choices=PROCESSING_STATUS, default="pending")
-    processing_report = models.TextField(blank=True, null=True)
+class BulkUploadSession(TimeStampedModel):
+    uploaded_by     = models.ForeignKey(CustomUser, on_delete=models.CASCADE,
+                                        related_name="bulk_uploads")
+    topic           = models.ForeignKey(Topic, on_delete=models.SET_NULL,
+                                        null=True, related_name="bulk_uploads")
+    category        = models.ForeignKey(Category, on_delete=models.SET_NULL,
+                                        null=True, related_name="bulk_uploads")
+    subcategory     = models.ForeignKey(SubCategory, on_delete=models.SET_NULL,
+                                        null=True, related_name="bulk_uploads")
+    raw_text        = models.TextField(help_text="Original pasted content")
+    questions_created   = models.PositiveIntegerField(default=0)
+    duplicates_skipped  = models.PositiveIntegerField(default=0)
+    errors_count        = models.PositiveIntegerField(default=0)
+    processing_report   = models.TextField(blank=True)
 
     def __str__(self):
-        return f"{self.uploaded_by.email} — {self.process_status}"
-
+        return f"BulkUpload by {self.uploaded_by.email} — {self.questions_created} Q"
 
 class ApprovalQueue(TimeStampedModel):
     OBJECT_TYPES = [
         ("topic", "Topic"),
         ("category", "Category"),
         ("subcategory", "SubCategory"),
-        ("pdf_upload",  "PDF Upload"),
         ("question", "Question"),
         ("answer", "Answer"),
+        ("bulk_upload",  "Bulk Upload"),
     ]
     object_type = models.CharField(max_length=50, choices=OBJECT_TYPES)
     object_id = models.UUIDField()

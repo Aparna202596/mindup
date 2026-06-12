@@ -69,7 +69,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
-
+NEVER_CACHE_HEADERS = True
 
 # ==============================================================================
 # 5. TEMPLATES & CRISPY FORMS
@@ -214,28 +214,10 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
 #     'protocol': 2
 # }
 
-# ==============================================================================
-# 14. CELERY BEAT (Periodic Tasks)
-# ==============================================================================
 
-CELERY_BEAT_SCHEDULE = {
-    "cleanup-old-notifications": {
-        "task": "apps.core.tasks.cleanup_old_notifications_task",
-        "schedule": crontab(hour=2, minute=0),   # daily at 2am
-    },
-    "update-search-vectors": {
-        "task": "apps.core.tasks.update_search_vectors_task",
-        "schedule": crontab(minute="*/30"),       # every 30 minutes
-    },
-}
-
-CELERY_TIMEZONE = "UTC"
-CELERY_TASK_TRACK_STARTED = True
-CELERY_TASK_TIME_LIMIT = 300   # 5 min max per task
-CELERY_TASK_SOFT_TIME_LIMIT = 240
 
 # ==============================================================================
-# 15. LOGGING
+# 14. LOGGING
 # ==============================================================================
 LOGGING = {
     "version": 1,
@@ -287,3 +269,13 @@ LOGGING = {
         },
     },
 }
+# ==============================================================================
+# 15. SECURITY SETTINGS
+# ==============================================================================
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_HTTPONLY    = True
+
+SECURE_BROWSER_XSS_FILTER   = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS              = 'DENY'

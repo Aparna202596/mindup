@@ -7,7 +7,9 @@ from apps.core.models import ApprovalQueue, Topic, Category, SubCategory, PDFUpl
 from apps.core.models import Question, Answer
 from apps.core.services.notification_service import create_notification
 from apps.core.services.audit_service import create_audit_log
-from apps.core.permissions import admin_required
+from core.decorators import admin_login_required, user_login_required
+from django.views.decorators.cache import never_cache
+from allauth.account import views as allauth_views
 
 
 TAB_LIST = [
@@ -16,11 +18,11 @@ TAB_LIST = [
     ("subcategories", "Subcategories"),
     ("questions",     "Questions"),
     ("answers",       "Answers"),
-    ("uploads",       "PDF Uploads"),
+    ("bulk_uploads",  "Bulk Uploads"),   
 ]
 
 
-@admin_required
+@admin_login_required
 def admin_dashboard(request):
     stats = get_dashboard_stats()
 
@@ -61,7 +63,7 @@ def admin_dashboard(request):
     })
 
 
-@admin_required
+@admin_login_required
 def approve_item(request, pk):
     if request.method != "POST":
         return redirect("admin-dashboard")
@@ -102,20 +104,6 @@ def approve_item(request, pk):
     item.save()
 
     return redirect("admin-dashboard")
-
-
-# def _set_status(item, status):
-#     model_map = {
-#         "topic":       Topic,
-#         "category":    Category,
-#         "subcategory": SubCategory,
-#         "pdf_upload":  PDFUpload, 
-#         "question":    Question,
-#         "answer":      Answer,
-#     }
-#     Model = model_map.get(item.object_type)
-#     if Model:
-#         Model.objects.filter(pk=item.object_id).update(status=status)
 
 def _set_status(item, status):
     model_map = {

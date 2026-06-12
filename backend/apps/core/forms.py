@@ -172,20 +172,70 @@ class AnswerPointForm(forms.ModelForm):
         }
 
 
-class PDFUploadForm(forms.ModelForm):
-    class Meta:
-        model = PDFUpload
-        fields = ["file"]
-        widgets = {
-            "file": forms.FileInput(attrs={"class": "form-control", "accept": ".pdf"}),
-        }
+class BulkQAUploadForm(forms.Form):
+    topic = forms.ModelChoiceField(
+        queryset=Topic.objects.filter(status="approved").order_by("name"),
+        widget=forms.Select(attrs={"class": "form-select", "id": "id_topic"}),
+        label="Topic",
+        empty_label="— Select Topic —",
+    )
+    category = forms.ModelChoiceField(
+        queryset=Category.objects.none(),   # populated via AJAX
+        widget=forms.Select(attrs={"class": "form-select", "id": "id_category",
+                                   "disabled": "disabled"}),
+        label="Category",
+        empty_label="— Select Category —",
+    )
+    subcategory = forms.ModelChoiceField(
+        queryset=SubCategory.objects.none(),  # populated via AJAX
+        widget=forms.Select(attrs={"class": "form-select", "id": "id_subcategory",
+                                   "disabled": "disabled"}),
+        label="Subcategory",
+        empty_label="— Select Subcategory —",
+    )
+    raw_text = forms.CharField(
+        widget=forms.Textarea(attrs={
+            "class": "form-control font-monospace",
+            "rows": 20,
+            "placeholder": (
+                "Paste your Q&A content here. Supported formats:\n\n"
+                "Format 1 — Q: / A: markers:\n"
+                "Q: What is Python?\n"
+                "A: Python is a high-level programming language.\n\n"
+                "Format 2 — Numbered questions:\n"
+                "1. What is Django?\n"
+                "Django is a Python web framework.\n\n"
+                "Format 3 — Heading blocks:\n"
+                "Q1. What is REST?\n"
+                "Answer: REST stands for Representational State Transfer."
+            ),
+            "spellcheck": "false",
+        }),
+        label="Paste Q&A Content",
+    )
 
-    def clean_file(self):
-        f = self.cleaned_data["file"]
-        validate_pdf_extension(f)
-        if f.size > 20 * 1024 * 1024:
-            raise forms.ValidationError("File size must be under 20 MB.")
-        return f
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # On POST, re-populate category/subcategory querysets for validation
+        if args and args[0]:
+            topic_id = args[0].get("topic")
+            category_id = args[0].get("category")
+            if topic_id:
+                self.fields["category"].queryset = Category.objects.filter(
+                    topic_id=topic_id, status="approved"
+                )
+                self.fields["category"].widget.attrs.pop("disabled", None)
+            if category_id:
+                self.fields["subcategory"].queryset = SubCategory.objects.filter(
+                    category_id=category_id, status="approved"
+                )
+                self.fields["subcategory"].widget.attrs.pop("disabled", None)
+
+    def clean_raw_text(self):
+        text = self.cleaned_data.get("raw_text", "").strip()
+        if len(text) < 20:
+            raise forms.ValidationError("Please paste at least some Q&A content.")
+        return text
 
 
 class SearchForm(forms.Form):

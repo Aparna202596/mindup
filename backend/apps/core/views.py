@@ -1,3 +1,4 @@
+import re
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -27,11 +28,16 @@ from apps.core.services.question_service import create_question
 from apps.core.services.search_service import global_search
 from apps.core.services.audit_service import create_audit_log
 from apps.core.services.duplicate_detector import is_duplicate_answer
-from apps.core.permissions import admin_required
+from core.decorators import admin_login_required, user_login_required
+from django.views.decorators.cache import never_cache
+from allauth.account import views as allauth_views
 
+from apps.core.forms import BulkQAUploadForm
+from apps.core.models import BulkUploadSession
+from apps.core.services.bulk_qa_parser import process_bulk_upload
 
 # ── HOME ──────────────────────────────────────────────────────────────────────
-
+@never_cache
 def home(request):
     recent_questions = Question.objects.select_related(
         "subcategory__category__topic", "created_by"
@@ -47,6 +53,7 @@ def home(request):
     })
 
 
+@never_cache
 def smart_login_redirect(request):
     if request.user.is_authenticated and getattr(request.user, "is_admin", False):
         return redirect("admin-dashboard")
@@ -54,7 +61,7 @@ def smart_login_redirect(request):
 
 
 # ── SEARCH ────────────────────────────────────────────────────────────────────
-
+@never_cache
 def search_view(request):
     form = SearchForm(request.GET)
     results, query = {}, ""
@@ -68,7 +75,8 @@ def search_view(request):
 
 
 # ── TOPICS ────────────────────────────────────────────────────────────────────
-
+@admin_login_required
+@user_login_required
 class TopicListView(ListView):
     model = Topic
     template_name = "topics/topic_list.html"
@@ -87,7 +95,8 @@ class TopicListView(ListView):
         ctx["search_query"] = self.request.GET.get("q", "")
         return ctx
 
-
+@admin_login_required
+@user_login_required
 class TopicDetailView(DetailView):
     model = Topic
     template_name = "topics/topic_detail.html"
@@ -98,7 +107,8 @@ class TopicDetailView(DetailView):
         ctx["categories"] = self.object.categories.filter(status="approved")
         return ctx
 
-
+@admin_login_required
+@user_login_required
 class TopicCreateView(LoginRequiredMixin, CreateView):
     model = Topic
     form_class = TopicForm
@@ -111,7 +121,7 @@ class TopicCreateView(LoginRequiredMixin, CreateView):
         return super().form_valid(form)
 
 
-@admin_required
+@admin_login_required
 def topic_edit(request, pk):
     topic = get_object_or_404(Topic, pk=pk)
     form = TopicEditForm(request.POST or None, instance=topic)
@@ -119,8 +129,8 @@ def topic_edit(request, pk):
         old = {"name": topic.name, "status": topic.status}
         form.save()
         create_audit_log(user=request.user, action="EDIT", object_type="Topic",
-                         object_id=topic.id, old_data=old,
-                         new_data={"name": topic.name, "status": topic.status})
+                        object_id=topic.id, old_data=old,
+                        new_data={"name": topic.name, "status": topic.status})
         messages.success(request, "Topic updated.")
         return redirect("admin-dashboard")
     return render(request, "dashboard/edit_form.html", {
@@ -129,7 +139,7 @@ def topic_edit(request, pk):
     })
 
 
-@admin_required
+@admin_login_required
 def topic_delete(request, pk):
     topic = get_object_or_404(Topic, pk=pk)
     if request.method == "POST":
@@ -144,7 +154,8 @@ def topic_delete(request, pk):
 
 
 # ── CATEGORIES ────────────────────────────────────────────────────────────────
-
+@admin_login_required
+@user_login_required
 class CategoryListView(ListView):
     model = Category
     template_name = "categories/category_list.html"
@@ -154,7 +165,8 @@ class CategoryListView(ListView):
     def get_queryset(self):
         return Category.objects.filter(status="approved").select_related("topic").order_by("-created_at")
 
-
+@admin_login_required
+@user_login_required
 class CategoryDetailView(DetailView):
     model = Category
     template_name = "categories/category_detail.html"
@@ -165,7 +177,8 @@ class CategoryDetailView(DetailView):
         ctx["subcategories"] = self.object.subcategories.filter(status="approved")
         return ctx
 
-
+@admin_login_required
+@user_login_required
 class CategoryCreateView(LoginRequiredMixin, CreateView):
     model = Category
     form_class = CategoryForm
@@ -178,7 +191,7 @@ class CategoryCreateView(LoginRequiredMixin, CreateView):
         return super().form_valid(form)
 
 
-@admin_required
+@admin_login_required
 def category_edit(request, pk):
     cat = get_object_or_404(Category, pk=pk)
     form = CategoryEditForm(request.POST or None, instance=cat)
@@ -196,7 +209,7 @@ def category_edit(request, pk):
     })
 
 
-@admin_required
+@admin_login_required
 def category_delete(request, pk):
     cat = get_object_or_404(Category, pk=pk)
     if request.method == "POST":
@@ -211,7 +224,8 @@ def category_delete(request, pk):
 
 
 # ── SUBCATEGORIES ─────────────────────────────────────────────────────────────
-
+@admin_login_required
+@user_login_required
 class SubCategoryDetailView(DetailView):
     model = SubCategory
     template_name = "categories/subcategory_detail.html"
@@ -223,7 +237,8 @@ class SubCategoryDetailView(DetailView):
         return ctx
 
 
-@login_required
+@admin_login_required
+@user_login_required
 def subcategory_create(request, category_pk=None):
     category = None
     if category_pk:
@@ -244,7 +259,7 @@ def subcategory_create(request, category_pk=None):
     })
 
 
-@admin_required
+@admin_login_required
 def subcategory_edit(request, pk):
     sub = get_object_or_404(SubCategory, pk=pk)
     form = SubCategoryEditForm(request.POST or None, instance=sub)
@@ -262,7 +277,7 @@ def subcategory_edit(request, pk):
     })
 
 
-@admin_required
+@admin_login_required
 def subcategory_delete(request, pk):
     sub = get_object_or_404(SubCategory, pk=pk)
     if request.method == "POST":
@@ -277,7 +292,8 @@ def subcategory_delete(request, pk):
 
 
 # ── QUESTIONS ─────────────────────────────────────────────────────────────────
-
+@admin_login_required
+@user_login_required
 class QuestionListView(ListView):
     model = Question
     template_name = "questions/question_list.html"
@@ -298,7 +314,8 @@ class QuestionListView(ListView):
         ctx["search_query"] = self.request.GET.get("q", "")
         return ctx
 
-
+@admin_login_required
+@user_login_required
 class QuestionDetailView(DetailView):
     model = Question
     template_name = "questions/question_detail.html"
@@ -316,8 +333,8 @@ class QuestionDetailView(DetailView):
         ctx["point_form"]  = AnswerPointForm()
         return ctx
 
-
-@login_required
+@admin_login_required
+@user_login_required
 def question_create_view(request):
     form = QuestionForm(request.POST or None)
     duplicates = []
@@ -341,72 +358,8 @@ def question_create_view(request):
     })
 
 
-@login_required
-def manual_qa_create(request):
-    """Add a Q&A pair together. Answer points entered one per line prefixed with • or -."""
-    form = ManualQuestionAnswerForm(request.POST or None)
-    if request.method == "POST" and form.is_valid():
-        from apps.core.services.duplicate_detector import normalize_question
 
-        title          = form.cleaned_data["title"]
-        subcategory    = form.cleaned_data["subcategory"]
-        answer_content = form.cleaned_data.get("answer_content", "").strip()
-
-        question = Question.objects.create(
-            subcategory=subcategory,
-            title=title,
-            normalized_title=normalize_question(title),
-            created_by=request.user,
-        )
-        create_audit_log(user=request.user, action="CREATE", object_type="Question",
-                         object_id=question.id, new_data={"title": title})
-
-        if answer_content:
-            # Split into bullets (lines starting with ·, •, -, *)
-            # and a plain prose block (everything else)
-            bullet_pat   = re.compile(r'^\s*[·•\-\*]\s*(.+)')
-            bullet_lines = []
-            prose_lines  = []
-
-            for line in answer_content.splitlines():
-                m = bullet_pat.match(line)
-                if m:
-                    bullet_lines.append(m.group(1).strip())
-                elif line.strip():
-                    prose_lines.append(line.strip())
-
-            prose_text = " ".join(prose_lines).strip()
-
-            if bullet_lines:
-                answer = Answer.objects.create(
-                    question=question,
-                    content=prose_text or "See key points below.",
-                    created_by=request.user,
-                )
-                for pt in bullet_lines:
-                    AnswerPoint.objects.create(
-                        answer=answer,
-                        point=pt,
-                        created_by=request.user,
-                    )
-            elif prose_text:
-                Answer.objects.create(
-                    question=question,
-                    content=prose_text,
-                    created_by=request.user,
-                )
-
-        messages.success(request, "Question and answer saved successfully.")
-        return redirect("question-detail", pk=question.pk)
-
-    return render(request, "questions/manual_qa_create.html", {"form": form})
-
-
-# keep re import accessible inside the view above
-import re
-
-
-@admin_required
+@admin_login_required
 def question_edit(request, pk):
     question = get_object_or_404(Question, pk=pk)
     form = QuestionEditForm(request.POST or None, instance=question)
@@ -427,7 +380,7 @@ def question_edit(request, pk):
     })
 
 
-@admin_required
+@admin_login_required
 def question_delete(request, pk):
     question = get_object_or_404(Question, pk=pk)
     if request.method == "POST":
@@ -444,7 +397,8 @@ def question_delete(request, pk):
 
 # ── ANSWERS ───────────────────────────────────────────────────────────────────
 
-@login_required
+@admin_login_required
+@user_login_required
 def answer_create_view(request, question_pk):
     question = get_object_or_404(Question, pk=question_pk)
     form = AnswerForm(request.POST or None)
@@ -470,7 +424,7 @@ def answer_create_view(request, question_pk):
     return render(request, "answers/answer_create.html", {"form": form, "question": question})
 
 
-@admin_required
+@admin_login_required
 def answer_edit(request, pk):
     answer = get_object_or_404(Answer, pk=pk)
     form = AnswerEditForm(request.POST or None, instance=answer)
@@ -488,7 +442,7 @@ def answer_edit(request, pk):
     })
 
 
-@admin_required
+@admin_login_required
 def answer_delete(request, pk):
     answer = get_object_or_404(Answer, pk=pk)
     question_pk = answer.question.pk
@@ -504,7 +458,8 @@ def answer_delete(request, pk):
     })
 
 
-@login_required
+@admin_login_required
+@user_login_required
 def answer_point_create_view(request, answer_pk):
     answer = get_object_or_404(Answer, pk=answer_pk)
     form = AnswerPointForm(request.POST or None)
@@ -517,82 +472,108 @@ def answer_point_create_view(request, answer_pk):
         return redirect("question-detail", pk=answer.question.pk)
     return render(request, "answers/answerpoint_create.html", {"form": form, "answer": answer})
 
+@user_login_required('core.bulk_upload_question')
+def bulk_qa_upload(request):
 
-# ── PDF UPLOAD ────────────────────────────────────────────────────────────────
 
-@login_required
-def pdf_upload_view(request):
-    form = PDFUploadForm(request.POST or None, request.FILES or None)
+    form = BulkQAUploadForm(request.POST or None)
+    report = None
+
     if request.method == "POST" and form.is_valid():
-        upload = form.save(commit=False)
-        upload.uploaded_by = request.user
-        upload.save()
+        subcategory = form.cleaned_data["subcategory"]
+        raw_text    = form.cleaned_data["raw_text"]
 
-        # ── Create approval queue entry so admin can see the upload ──────────
-        # (object_type "pdf_upload" – admin dashboard filters on this)
-        ApprovalQueue.objects.create(
-            object_type="pdf_upload",
-            object_id=upload.id,
-            requested_by=request.user,
+        # Create session record
+        session = BulkUploadSession.objects.create(
+            uploaded_by=request.user,
+            topic=form.cleaned_data["topic"],
+            category=form.cleaned_data["category"],
+            subcategory=subcategory,
+            raw_text=raw_text,
         )
 
-        # ── Process PDF ───────────────────────────────────────────────────────
-        try:
-            from apps.core.tasks import process_pdf_task
-            process_pdf_task.delay(str(upload.id))
+        report = process_bulk_upload(
+            user=request.user,
+            subcategory=subcategory,
+            raw_text=raw_text,
+            session=session,
+        )
+
+        if report["questions_created"] > 0:
             messages.success(
                 request,
-                "PDF uploaded. Processing started in background. "
-                "Check Upload History for results."
+                f"✓ {report['questions_created']} question(s) and "
+                f"{report['answers_created']} answer(s) saved successfully."
             )
-        except Exception:
-            from apps.core.services.pdf_processor import process_pdf
-            report = process_pdf(str(upload.id))
-            q = report.get("questions_created", 0)
-            a = report.get("answers_created", 0)
-            messages.success(
+        if report["duplicates_skipped"]:
+            messages.warning(
                 request,
-                f"PDF processed: {q} question(s) and {a} answer(s) extracted."
+                f"⚠ {len(report['duplicates_skipped'])} duplicate(s) skipped."
             )
+        if report.get("errors"):
+            messages.error(request, f"✗ {len(report['errors'])} error(s) during processing.")
 
-        return redirect("upload-history")
+        # Don't redirect — show report on same page
+        form = BulkQAUploadForm()  # reset form after success
 
-    return render(request, "uploads/pdf_upload.html", {"form": form})
+    # AJAX: return categories for a topic
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return _ajax_load_options(request)
 
-
-@login_required
-def upload_history_view(request):
-    uploads = PDFUpload.objects.filter(uploaded_by=request.user).order_by("-created_at")
-    return render(request, "uploads/upload_history.html", {"uploads": uploads})
-
-
-# ── USER DASHBOARD ────────────────────────────────────────────────────────────
-
-@login_required
-def user_dashboard(request):
-    """Only shown to non-admin users."""
-    if request.user.is_admin:
-        return redirect("admin-dashboard")
-
-    user = request.user
-    notification_qs = Notification.objects.filter(user=user)
-    return render(request, "dashboard/user_dashboard.html", {
-        "my_questions":  Question.objects.filter(created_by=user).order_by("-created_at")[:5],
-        "my_answers":    Answer.objects.filter(created_by=user).select_related("question").order_by("-created_at")[:5],
-        "my_uploads":    PDFUpload.objects.filter(uploaded_by=user).order_by("-created_at")[:5],
-        "my_topics":     Topic.objects.filter(created_by=user).order_by("-created_at")[:5],
-        "notifications": notification_qs.order_by("-created_at")[:10],
-        "unread_count":  notification_qs.filter(is_read=False).count(),
+    return render(request, "questions/bulk_qa_upload.html", {
+        "form":   form,
+        "report": report,
     })
 
 
-@login_required
+def ajax_load_categories(request):
+    """AJAX: return <option> list for a given topic_id."""
+    topic_id = request.GET.get("topic_id")
+    cats = Category.objects.filter(
+        topic_id=topic_id, status="approved"
+    ).order_by("name").values("id", "name")
+    data = [{"id": str(c["id"]), "name": c["name"]} for c in cats]
+    from django.http import JsonResponse
+    return JsonResponse({"categories": data})
+
+
+def ajax_load_subcategories(request):
+    """AJAX: return <option> list for a given category_id."""
+    cat_id = request.GET.get("category_id")
+    subs = SubCategory.objects.filter(
+        category_id=cat_id, status="approved"
+    ).order_by("name").values("id", "name")
+    data = [{"id": str(s["id"]), "name": s["name"]} for s in subs]
+    from django.http import JsonResponse
+    return JsonResponse({"subcategories": data})
+
+
+# 7. Update user_dashboard — remove PDF references:
+@user_login_required()
+@never_cache
+def user_dashboard(request):
+    if request.user.is_superuser:
+        return redirect("admin-dashboard")
+    user = request.user
+    notification_qs = Notification.objects.filter(user=user)
+    return render(request, "dashboard/user_dashboard.html", {
+        "my_questions":     Question.objects.filter(created_by=user).order_by("-created_at")[:5],
+        "my_answers":       Answer.objects.filter(created_by=user).select_related("question").order_by("-created_at")[:5],
+        "my_bulk_uploads":  BulkUploadSession.objects.filter(uploaded_by=user).order_by("-created_at")[:5],
+        "my_topics":        Topic.objects.filter(created_by=user).order_by("-created_at")[:5],
+        "notifications":    notification_qs.order_by("-created_at")[:10],
+        "unread_count":     notification_qs.filter(is_read=False).count(),
+    })
+
+@admin_login_required
+@user_login_required
 def mark_notification_read(request, pk):
     Notification.objects.filter(pk=pk, user=request.user).update(is_read=True)
     return redirect(request.META.get("HTTP_REFERER", "/dashboard/"))
 
 
-@login_required
+@admin_login_required
+@user_login_required
 def mark_all_notifications_read(request):
     Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
     messages.success(request, "All notifications marked as read.")
@@ -601,7 +582,7 @@ def mark_all_notifications_read(request):
 
 # ── AUDIT LOG ─────────────────────────────────────────────────────────────────
 
-@admin_required
+@admin_login_required
 def audit_log_view(request):
     logs = AuditLog.objects.select_related("user").order_by("-created_at")
     action_filter = request.GET.get("action", "")
@@ -622,7 +603,7 @@ def audit_log_view(request):
 
 # ── CONTENT MANAGEMENT (admin) — kept as alias for admin-dashboard tab ────────
 
-@admin_required
+@admin_login_required
 def admin_content_view(request):
     """Redirect to admin dashboard with the correct tab."""
     tab = request.GET.get("tab", "topics")
@@ -631,7 +612,7 @@ def admin_content_view(request):
 
 # ── USER MANAGEMENT ───────────────────────────────────────────────────────────
 
-@admin_required
+@admin_login_required
 def user_list_view(request):
     from apps.core.models import CustomUser, Role
     return render(request, "dashboard/user_list.html", {
@@ -640,7 +621,7 @@ def user_list_view(request):
     })
 
 
-@admin_required
+@admin_login_required
 def user_role_update(request, pk):
     from apps.core.models import CustomUser, Role
     user = get_object_or_404(CustomUser, pk=pk)

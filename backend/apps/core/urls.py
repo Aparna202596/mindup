@@ -1,7 +1,13 @@
 from django.urls import path
 from apps.core import views
+from django.views.decorators.cache import never_cache
+from allauth.account import views as allauth_views
+
 
 urlpatterns = [
+    path("accounts/login/",  never_cache(allauth_views.LoginView.as_view()),  name="account_login"),
+    path("accounts/logout/", never_cache(allauth_views.LogoutView.as_view()), name="account_logout"),
+    
     # Home & Auth
     path("", views.home, name="home"),
     path("login-redirect/", views.smart_login_redirect, name="smart-login-redirect"),
@@ -33,7 +39,6 @@ urlpatterns = [
     # Questions
     path("questions/", views.QuestionListView.as_view(), name="question-list"),
     path("questions/create/", views.question_create_view, name="question-create"),
-    path("questions/manual/", views.manual_qa_create, name="manual-qa-create"),
     path("questions/<uuid:pk>/", views.QuestionDetailView.as_view(), name="question-detail"),
     path("questions/<uuid:pk>/edit/", views.question_edit, name="question-edit"),
     path("questions/<uuid:pk>/delete/", views.question_delete, name="question-delete"),
@@ -43,10 +48,6 @@ urlpatterns = [
     path("answers/<uuid:pk>/edit/", views.answer_edit, name="answer-edit"),
     path("answers/<uuid:pk>/delete/", views.answer_delete, name="answer-delete"),
     path("answers/<uuid:answer_pk>/point/", views.answer_point_create_view, name="answerpoint-create"),
-
-    # Uploads
-    path("upload/", views.pdf_upload_view, name="pdf-upload"),
-    path("upload/history/", views.upload_history_view, name="upload-history"),
 
     # User Dashboard
     path("dashboard/", views.user_dashboard, name="user-dashboard"),
@@ -58,4 +59,9 @@ urlpatterns = [
     path("admin-content/", views.admin_content_view, name="admin-content"),
     path("users/", views.user_list_view, name="user-list"),
     path("users/<uuid:pk>/role/", views.user_role_update, name="user-role-update"),
+
+    path("ajax/categories/",    views.ajax_load_categories,    name="ajax-categories"),
+    path("ajax/subcategories/", views.ajax_load_subcategories, name="ajax-subcategories"),
+    path("questions/bulk/",     views.bulk_qa_upload,          name="bulk-qa-upload"),
+
 ]

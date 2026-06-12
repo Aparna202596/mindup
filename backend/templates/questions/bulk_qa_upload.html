@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid px-4">
+  <div class="row">
+    <!-- Left: Form -->
+    <div class="col-lg-5">
+      <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0"><i class="bi bi-cloud-upload me-2"></i>Bulk Q&A Upload</h5>
+        </div>
+        <div class="card-body">
+          <!-- Step 1: Topic -->
+          <div class="mb-3">
+            <label class="form-label fw-semibold">1. Select Topic</label>
+            {{ form.topic }}
+          </div>
+          <!-- Step 2: Category (disabled until topic selected) -->
+          <div class="mb-3">
+            <label class="form-label fw-semibold">2. Select Category</label>
+            {{ form.category }}
+          </div>
+          <!-- Step 3: Subcategory (disabled until category selected) -->
+          <div class="mb-3">
+            <label class="form-label fw-semibold">3. Select Subcategory</label>
+            {{ form.subcategory }}
+          </div>
+          <!-- Step 4: Paste text -->
+          <div class="mb-3">
+            <label class="form-label fw-semibold">4. Paste Q&A Content</label>
+            <div id="charCount" class="text-muted small mb-1">0 characters</div>
+            {{ form.raw_text }}
+          </div>
+          <button type="button" class="btn btn-primary w-100"
+                  id="previewBtn" disabled>
+            <i class="bi bi-eye me-1"></i>Preview & Upload
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- Right: Instructions + Results -->
+    <div class="col-lg-7">
+      <!-- Format guide accordion -->
+      <!-- Report section (shown after upload) -->
+      {% if report %}
+        <!-- Stats cards: Created / Duplicates / Errors -->
+        <!-- Duplicate detail table -->
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Confirmation modal for submit -->
+<div class="modal fade" id="uploadConfirmModal" ...>
+  <div class="modal-body">
+    Upload <strong id="previewCount">?</strong> detected Q&A pairs
+    to <strong id="previewSubcat">?</strong>?
+  </div>
+</div>
+{% endblock %}
