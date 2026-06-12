@@ -1,14 +1,36 @@
-<aside class="sidebar">
-  <div class="sidebar-header">Browse</div>
-  <ul class="sidebar-nav">
-    <li><a href="{% url 'topic-list' %}">Topics</a></li>
-    <li><a href="{% url 'category-list' %}">Categories</a></li>
-    <li><a href="{% url 'question-list' %}">Questions</a></li>
-    <li><a href="{% url 'search' %}">Search</a></li>
+<div class="card shadow-sm mb-3">
+  <div class="card-header fw-semibold bg-primary text-white py-2">
+    <i class="bi bi-compass me-1"></i>Browse
+  </div>
+  <div class="list-group list-group-flush">
+    <a href="{% url 'topic-list' %}"    class="list-group-item list-group-item-action py-2">
+      <i class="bi bi-journals me-2 text-primary"></i>Topics
+    </a>
+    <a href="{% url 'category-list' %}" class="list-group-item list-group-item-action py-2">
+      <i class="bi bi-folder2 me-2 text-primary"></i>Categories
+    </a>
+    <a href="{% url 'question-list' %}" class="list-group-item list-group-item-action py-2">
+      <i class="bi bi-question-circle me-2 text-primary"></i>Questions
+    </a>
+    <a href="{% url 'search' %}"        class="list-group-item list-group-item-action py-2">
+      <i class="bi bi-search me-2 text-primary"></i>Search
+    </a>
     {% if user.is_authenticated %}
-      <li><a href="{% url 'topic-create' %}">+ New Topic</a></li>
-      <li><a href="{% url 'category-create' %}">+ New Category</a></li>
-      <li><a href="{% url 'question-create' %}">+ Ask Question</a></li>
+      <div class="list-group-item bg-light py-1 small text-muted fw-semibold text-uppercase" style="font-size:.7rem;">
+        Create
+      </div>
+      <a href="{% url 'topic-create' %}"    class="list-group-item list-group-item-action py-2">
+        <i class="bi bi-plus-circle me-2 text-success"></i>New Topic
+      </a>
+      <a href="{% url 'category-create' %}" class="list-group-item list-group-item-action py-2">
+        <i class="bi bi-plus-circle me-2 text-success"></i>New Category
+      </a>
+      <a href="{% url 'question-create' %}" class="list-group-item list-group-item-action py-2">
+        <i class="bi bi-plus-circle me-2 text-success"></i>Ask Question
+      </a>
+      <a href="{% url 'bulk-qa-upload' %}"  class="list-group-item list-group-item-action py-2">
+        <i class="bi bi-cloud-upload me-2 text-success"></i>Bulk Upload
+      </a>
     {% endif %}
-  </ul>
-</aside>
+  </div>
+</div>

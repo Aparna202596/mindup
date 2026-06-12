@@ -1,60 +1,121 @@
 {% extends "base.html" %}
 {% block title %}MindUp — Knowledge Base{% endblock %}
+
 {% block content %}
 
-<div class="hero">
-  <h1 class="hero-title">Learn, Ask, Share</h1>
-  <p class="hero-sub">A structured knowledge base for teams. Browse topics, ask questions, and build answers together.</p>
-  <div class="hero-actions">
-    <a href="{% url 'question-create' %}" class="btn btn-primary btn-lg">Ask a Question</a>
-    <a href="{% url 'topic-list' %}" class="btn btn-secondary btn-lg">Browse Topics</a>
+<!-- ── Hero ─────────────────────────────────────────────────────────────────── -->
+<div class="rounded-3 text-white mb-4 p-5 hero-gradient">
+  <div class="text-center">
+    <h1 class="display-5 fw-bold">Learn, Ask, Share</h1>
+    <p class="lead opacity-90 mb-4">
+      A structured knowledge base for teams. Browse topics, ask questions,
+      and build answers together.
+    </p>
+    <div class="d-flex gap-3 justify-content-center flex-wrap">
+      <a href="{% url 'question-create' %}" class="btn btn-light btn-lg fw-semibold">
+        <i class="bi bi-plus-circle me-2"></i>Ask a Question
+      </a>
+      <a href="{% url 'topic-list' %}" class="btn btn-outline-light btn-lg">
+        <i class="bi bi-journals me-2"></i>Browse Topics
+      </a>
+      {% if user.is_authenticated %}
+        <a href="{% url 'bulk-qa-upload' %}" class="btn btn-warning btn-lg fw-semibold">
+          <i class="bi bi-cloud-upload me-2"></i>Bulk Upload
+        </a>
+      {% endif %}
+    </div>
   </div>
 </div>
 
-{% if approved_topics %}
-<section class="mb-4">
-  <div class="section-header">
-    <h2 class="section-title">Topics</h2>
-    <a href="{% url 'topic-list' %}" class="text-sm">View all →</a>
+<!-- ── Stats cards ────────────────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card text-center border-0 shadow-sm h-100">
+      <div class="card-body">
+        <div class="stat-number text-primary">{{ total_questions }}</div>
+        <div class="stat-label text-muted"><i class="bi bi-question-circle me-1"></i>Questions</div>
+      </div>
+    </div>
   </div>
-  <div class="card-grid">
+  <div class="col-6 col-md-3">
+    <div class="card text-center border-0 shadow-sm h-100">
+      <div class="card-body">
+        <div class="stat-number text-success">{{ total_answers }}</div>
+        <div class="stat-label text-muted"><i class="bi bi-chat-text me-1"></i>Answers</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center border-0 shadow-sm h-100">
+      <div class="card-body">
+        <div class="stat-number text-info">{{ total_topics }}</div>
+        <div class="stat-label text-muted"><i class="bi bi-journals me-1"></i>Topics</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center border-0 shadow-sm h-100">
+      <div class="card-body">
+        <div class="stat-number text-warning">{{ total_categories }}</div>
+        <div class="stat-label text-muted"><i class="bi bi-folder2 me-1"></i>Categories</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Topics ─────────────────────────────────────────────────────────────── -->
+{% if approved_topics %}
+<section class="mb-5">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 fw-bold mb-0"><i class="bi bi-journals me-2 text-primary"></i>Topics</h2>
+    <a href="{% url 'topic-list' %}" class="btn btn-sm btn-outline-primary">View all →</a>
+  </div>
+  <div class="row g-3">
     {% for topic in approved_topics %}
-    <a href="{% url 'topic-detail' topic.pk %}" class="topic-card" style="text-decoration:none;">
-      <div class="topic-card-tag">topic</div>
-      <div class="topic-card-title">{{ topic.name }}</div>
-      {% if topic.description %}
-        <div class="topic-card-meta">{{ topic.description|truncatechars:80 }}</div>
-      {% endif %}
-      <div class="topic-card-meta">{{ topic.categories.count }} categories</div>
-    </a>
+    <div class="col-sm-6 col-md-4 col-lg-3">
+      <a href="{% url 'topic-detail' topic.pk %}" class="card h-100 text-decoration-none topic-card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="small text-primary text-uppercase fw-semibold mb-1" style="letter-spacing:.05em;">topic</div>
+          <div class="fw-bold mb-1">{{ topic.name }}</div>
+          {% if topic.description %}
+            <div class="small text-muted">{{ topic.description|truncatechars:60 }}</div>
+          {% endif %}
+          <div class="small text-muted mt-2">
+            <i class="bi bi-folder2 me-1"></i>{{ topic.categories.count }} categories
+          </div>
+        </div>
+      </a>
+    </div>
     {% endfor %}
   </div>
 </section>
 {% endif %}
 
+<!-- ── Recent Questions ────────────────────────────────────────────────────── -->
 {% if recent_questions %}
 <section>
-  <div class="section-header">
-    <h2 class="section-title">Recent Questions</h2>
-    <a href="{% url 'question-list' %}" class="text-sm">View all →</a>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 fw-bold mb-0"><i class="bi bi-clock-history me-2 text-primary"></i>Recent Questions</h2>
+    <a href="{% url 'question-list' %}" class="btn btn-sm btn-outline-primary">View all →</a>
   </div>
-  <div style="display:flex; flex-direction:column; gap:0.75rem;">
+  <div class="d-flex flex-column gap-2">
     {% for q in recent_questions %}
-    <a href="{% url 'question-detail' q.pk %}" class="question-card" style="text-decoration:none;">
-      <div class="topic-card-title">{{ q.title|truncatechars:120 }}</div>
-      <div class="topic-card-meta">
-        <span>{{ q.subcategory.category.topic.name }} → {{ q.subcategory.name }}</span>
-        <span>&nbsp;·&nbsp;{{ q.answers.count }} answers</span>
-        <span>&nbsp;·&nbsp;{{ q.view_count }} views</span>
+    <a href="{% url 'question-detail' q.pk %}" class="question-card text-decoration-none">
+      <div class="fw-semibold text-dark mb-1">{{ q.title|truncatechars:120 }}</div>
+      <div class="small text-muted">
+        <span class="badge bg-light text-primary border me-1">{{ q.subcategory.category.topic.name }}</span>
+        <span class="text-muted">{{ q.subcategory.name }}</span>
+        <span class="ms-2"><i class="bi bi-chat me-1"></i>{{ q.answers.count }}</span>
+        <span class="ms-2"><i class="bi bi-eye me-1"></i>{{ q.view_count }}</span>
       </div>
     </a>
     {% endfor %}
   </div>
 </section>
 {% else %}
-<div class="empty-state">
-  <div class="empty-state-icon">🧠</div>
-  <p>No questions yet. Be the first to contribute.</p>
+<div class="text-center py-5 text-muted">
+  <div style="font-size:3rem;">🧠</div>
+  <p class="mt-2">No questions yet. Be the first to contribute.</p>
   {% if user.is_authenticated %}
     <a href="{% url 'question-create' %}" class="btn btn-primary">Ask the first question</a>
   {% else %}
@@ -62,4 +123,5 @@
   {% endif %}
 </div>
 {% endif %}
+
 {% endblock %}

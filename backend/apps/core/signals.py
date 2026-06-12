@@ -20,7 +20,7 @@ def topic_post_save(sender, instance, created, **kwargs):
     from apps.core.services.audit_service import create_audit_log
     create_approval_request(object_type="topic", object_id=instance.id, user=instance.created_by)
     create_audit_log(user=instance.created_by, action="CREATE", object_type="Topic",
-                     object_id=instance.id, new_data={"name": instance.name})
+                    object_id=instance.id, new_data={"name": instance.name})
 
 
 @receiver(post_save, sender=Category)

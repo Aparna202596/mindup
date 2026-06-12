@@ -1,18 +1,26 @@
-<div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header bg-danger text-white">
-        <h5 class="modal-title" id="confirmModalTitle">Confirm Action</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+    <div class="modal-content shadow">
+      <div class="modal-header" id="confirmModalHeader">
+        <h5 class="modal-title" id="confirmModalLabel">
+          <i class="bi bi-exclamation-triangle-fill me-2 text-danger"></i>
+          <span id="confirmModalTitle">Confirm Action</span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body" id="confirmModalBody">
         Are you sure you want to proceed? This action cannot be undone.
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <form id="confirmModalForm" method="post" class="d-inline">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-x-circle me-1"></i>Cancel
+        </button>
+        <form id="confirmModalForm" method="post" class="d-inline m-0">
           {% csrf_token %}
-          <button type="submit" class="btn btn-danger" id="confirmModalBtn">Confirm</button>
+          <button type="submit" class="btn btn-danger" id="confirmModalBtn">
+            <i class="bi bi-trash me-1" id="confirmModalIcon"></i>
+            <span id="confirmModalBtnText">Confirm</span>
+          </button>
         </form>
       </div>
     </div>

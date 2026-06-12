@@ -1,19 +1,22 @@
-from django.contrib import admin
+from django.contrib       import admin
 from django.contrib.auth.admin import UserAdmin
 from apps.core.models import (
     CustomUser, Role, Topic, Category, SubCategory,
-    Question, Answer, AnswerPoint, PDFUpload,
+    Question, Answer, AnswerPoint,
+    BulkUploadSession,
     ApprovalQueue, Notification, AuditLog,
 )
+
 @admin.register(CustomUser)
 class CustomUserAdmin(UserAdmin):
-    list_display = ("email", "role", "is_staff", "date_joined")
+    list_display  = ("email", "role", "is_staff", "is_superuser", "date_joined")
     search_fields = ("email",)
-    ordering = ("email",)
+    ordering      = ("email",)
     fieldsets = (
-        (None, {"fields": ("email", "password")}),
-        ("Role", {"fields": ("role",)}),
-        ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser")}),
+        (None,          {"fields": ("email", "password")}),
+        ("Role",        {"fields": ("role",)}),
+        ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser",
+                                    "groups", "user_permissions")}),
     )
     add_fieldsets = (
         (None, {"fields": ("email", "password1", "password2")}),
@@ -27,26 +30,26 @@ class RoleAdmin(admin.ModelAdmin):
 
 @admin.register(Topic)
 class TopicAdmin(admin.ModelAdmin):
-    list_display = ("name", "status", "created_by", "created_at")
+    list_display  = ("name", "status", "created_by", "created_at")
     search_fields = ("name",)
-    list_filter = ("status",)
+    list_filter   = ("status",)
 
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
     list_display = ("name", "topic", "status", "created_by")
-    list_filter = ("status",)
+    list_filter  = ("status",)
 
 
 @admin.register(SubCategory)
 class SubCategoryAdmin(admin.ModelAdmin):
     list_display = ("name", "category", "status")
-    list_filter = ("status",)
+    list_filter  = ("status",)
 
 
 @admin.register(Question)
 class QuestionAdmin(admin.ModelAdmin):
-    list_display = ("title", "created_by", "view_count", "created_at")
+    list_display  = ("title", "subcategory", "created_by", "view_count", "created_at")
     search_fields = ("title",)
 
 
@@ -60,26 +63,33 @@ class AnswerPointAdmin(admin.ModelAdmin):
     list_display = ("answer", "created_by", "created_at")
 
 
-@admin.register(PDFUpload)
-class PDFUploadAdmin(admin.ModelAdmin):
-    list_display = ("uploaded_by", "process_status", "created_at")
-    list_filter = ("process_status",)
+@admin.register(BulkUploadSession)
+class BulkUploadSessionAdmin(admin.ModelAdmin):
+    list_display  = ("uploaded_by", "subcategory", "questions_created",
+                    "duplicates_skipped", "errors_count", "created_at")
+    list_filter   = ("subcategory__category__topic",)
+    readonly_fields = ("uploaded_by", "topic", "category", "subcategory",
+                        "raw_text", "questions_created", "duplicates_skipped",
+                        "errors_count", "processing_report", "created_at")
 
 
 @admin.register(ApprovalQueue)
 class ApprovalQueueAdmin(admin.ModelAdmin):
     list_display = ("object_type", "requested_by", "is_approved", "reviewed_by")
-    list_filter = ("object_type", "is_approved")
+    list_filter  = ("object_type", "is_approved")
 
 
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):
     list_display = ("user", "title", "is_read", "created_at")
-    list_filter = ("is_read",)
+    list_filter  = ("is_read",)
 
 
 @admin.register(AuditLog)
 class AuditLogAdmin(admin.ModelAdmin):
-    list_display = ("user", "action", "object_type", "created_at")
-    list_filter = ("action", "object_type")
-    readonly_fields = ("user", "action", "object_type", "object_id", "previous_data", "new_data", "created_at")
+    list_display  = ("user", "action", "object_type", "created_at")
+    list_filter   = ("action", "object_type")
+    readonly_fields = (
+        "user", "action", "object_type", "object_id",
+        "previous_data", "new_data", "created_at",
+    )
