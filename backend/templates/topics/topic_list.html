@@ -1,56 +1,60 @@
 {% extends "base.html" %}
 {% block title %}Topics — MindUp{% endblock %}
 {% block content %}
-<div class="flex-between mb-2">
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
   <div>
-    <h1 class="page-title">Topics</h1>
-    <p class="page-subtitle">Browse all approved topics</p>
+    <h1 class="h3 fw-bold mb-1"><i class="bi bi-journals me-2 text-primary"></i>Topics</h1>
+    <p class="text-muted mb-0 small">Browse all approved topics</p>
   </div>
   {% if user.is_authenticated %}
-    <a href="{% url 'topic-create' %}" class="btn btn-primary">+ New Topic</a>
+    <a href="{% url 'topic-create' %}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus me-1"></i>New Topic
+    </a>
   {% endif %}
 </div>
 
-<form method="get" style="margin-bottom:1.5rem;">
-  <div style="display:flex; gap:0.5rem; max-width:420px;">
-    <input type="search" name="q" value="{{ search_query }}" placeholder="Filter topics..." class="form-control">
-    <button type="submit" class="btn btn-secondary">Search</button>
+<form method="get" class="mb-4" style="max-width:420px;">
+  <div class="input-group">
+    <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+    <input type="search" name="q" value="{{ search_query }}" placeholder="Filter topics…" class="form-control">
+    <button type="submit" class="btn btn-outline-secondary">Go</button>
   </div>
 </form>
 
 {% if topics %}
-  <div class="card-grid">
+  <div class="row g-3">
     {% for topic in topics %}
-    <a href="{% url 'topic-detail' topic.pk %}" class="topic-card" style="text-decoration:none;">
-      <div class="topic-card-title">{{ topic.name }}</div>
-      {% if topic.description %}
-        <div class="topic-card-meta">{{ topic.description|truncatechars:80 }}</div>
-      {% endif %}
-      <div class="topic-card-meta">{{ topic.categories.count }} categories</div>
-    </a>
+    <div class="col-sm-6 col-md-4 col-lg-3">
+      <a href="{% url 'topic-detail' topic.pk %}" class="card h-100 topic-card text-decoration-none border-0 shadow-sm">
+        <div class="card-body">
+          <div class="small text-primary text-uppercase fw-semibold mb-1" style="letter-spacing:.05em;">topic</div>
+          <div class="fw-bold mb-1">{{ topic.name }}</div>
+          {% if topic.description %}
+            <div class="small text-muted">{{ topic.description|truncatechars:70 }}</div>
+          {% endif %}
+          <div class="small text-muted mt-2">
+            <i class="bi bi-folder2 me-1"></i>{{ topic.cat_count }} categories
+          </div>
+        </div>
+      </a>
+    </div>
     {% endfor %}
   </div>
-
   {% if is_paginated %}
-  <nav class="pagination">
-    {% if page_obj.has_previous %}
-      <span class="page-item"><a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">&laquo;</a></span>
-    {% endif %}
+  <nav class="mt-4"><ul class="pagination justify-content-center">
+    {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ search_query }}"><i class="bi bi-chevron-left"></i></a></li>{% endif %}
     {% for num in page_obj.paginator.page_range %}
-      <span class="page-item {% if page_obj.number == num %}active{% endif %}">
-        <a href="?page={{ num }}{% if search_query %}&q={{ search_query }}{% endif %}">{{ num }}</a>
-      </span>
+      {% if page_obj.number == num %}<li class="page-item active"><span class="page-link">{{ num }}</span></li>
+      {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}<li class="page-item"><a class="page-link" href="?page={{ num }}&q={{ search_query }}">{{ num }}</a></li>{% endif %}
     {% endfor %}
-    {% if page_obj.has_next %}
-      <span class="page-item"><a href="?page={{ page_obj.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">&raquo;</a></span>
-    {% endif %}
-  </nav>
+    {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ search_query }}"><i class="bi bi-chevron-right"></i></a></li>{% endif %}
+  </ul></nav>
   {% endif %}
 {% else %}
-  <div class="empty-state">
-    <div class="empty-state-icon">📚</div>
+  <div class="text-center py-5 text-muted">
+    <i class="bi bi-journals fs-1 d-block mb-3"></i>
     <p>No topics found.</p>
-    {% if user.is_authenticated %}<a href="{% url 'topic-create' %}" class="btn btn-primary mt-2">Create the first topic</a>{% endif %}
+    {% if user.is_authenticated %}<a href="{% url 'topic-create' %}" class="btn btn-primary">Create the first topic</a>{% endif %}
   </div>
 {% endif %}
 {% endblock %}

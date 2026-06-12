@@ -9,7 +9,6 @@
   </div>
   <div style="display:flex; gap:0.5rem;">
     <a href="{% url 'question-create' %}" class="btn btn-primary">Ask Question</a>
-    <a href="{% url 'pdf-upload' %}" class="btn btn-secondary">Upload PDF</a>
   </div>
 </div>
 
@@ -100,10 +99,6 @@
   </div>
 
   <div>
-    <div class="section-header">
-      <h2 class="section-title">My Uploads</h2>
-      <a href="{% url 'pdf-upload' %}" class="text-sm">+ Upload</a>
-    </div>
     {% for u in my_uploads %}
     <div class="question-card mb-1" style="margin-bottom:0.625rem; display:flex; flex-direction:column;">
       <div style="display:flex; justify-content:space-between; align-items:center;">
