@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{{ topic.name }} — MindUp{% endblock %}
+
+{% block content %}
+{% with fav_topic_ids=fav_topic_ids fav_cat_ids=fav_cat_ids fav_subcat_ids=fav_subcat_ids fav_q_ids=fav_q_ids %}
+{% include "includes/detail_content.html" %}
+{% endwith %}
+{% endblock %}
+
+{% block extra_js %}
+{% include "includes/detail_scripts.html" %}
+{% endblock %}

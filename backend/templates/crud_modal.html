@@ -1,0 +1,26 @@
+<div class="modal fade" id="crudModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header border-bottom-0 pb-0">
+            <h5 class="modal-title fw-bold" id="crudModalTitle">
+            <i class="bi bi-pencil-square me-2 text-primary"></i>
+            <span id="crudModalTitleText">Edit</span>
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body pt-2" id="crudModalBody">
+            <!-- Dynamic form content injected here -->
+        </div>
+        <div class="modal-footer border-top-0 pt-0 gap-2">
+            <button type="button" class="btn btn-light" data-bs-dismiss="modal">
+            <i class="bi bi-x-lg me-1"></i>Cancel
+            </button>
+            <button type="button" class="btn btn-primary" id="crudModalSaveBtn">
+            <span class="spinner-border spinner-border-sm d-none me-2" id="crudSaveSpinner"></span>
+            <i class="bi bi-check-lg me-1" id="crudSaveIcon"></i>
+            <span id="crudSaveBtnText">Save</span>
+            </button>
+        </div>
+        </div>
+    </div>
+</div>

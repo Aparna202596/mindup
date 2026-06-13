@@ -1,63 +1,105 @@
 {% extends "base.html" %}
-{% block title %}Search — MindUp{% endblock %}
-{% block content %}
-<h1 class="page-title">Search</h1>
+{% block title %}Search{% if query %}: {{ query }}{% endif %} — MindUp{% endblock %}
 
-<form method="get" style="margin-bottom:1.5rem;">
-  <div style="display:flex; gap:0.5rem; max-width:520px;">
-    <input type="search" name="q" value="{{ query }}" placeholder="Search anything..." class="form-control">
-    <button type="submit" class="btn btn-primary">Search</button>
-  </div>
-</form>
+{% block content %}
+<div class="mb-4">
+  <h1 class="h3 fw-bold mb-3">
+    <i class="bi bi-search me-2 text-primary"></i>
+    {% if query %}Results for "{{ query }}"{% else %}Search{% endif %}
+  </h1>
+  <form method="get" class="d-flex gap-2" style="max-width:500px;">
+    <div class="input-group">
+      <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+      <input type="text" name="q" class="form-control border-start-0 ps-0"
+             placeholder="Search questions, topics…" value="{{ query }}" autofocus>
+    </div>
+    <button type="submit" class="btn btn-primary px-4">Search</button>
+  </form>
+</div>
 
 {% if query %}
   {% if results.questions or results.topics or results.categories %}
 
-    {% if results.topics %}
-    <section class="mb-3">
-      <h2 class="section-title">Topics</h2>
-      <div class="card-grid">
-        {% for t in results.topics %}
-        <a href="{% url 'topic-detail' t.pk %}" class="topic-card" style="text-decoration:none;">
-          <div class="topic-card-title">{{ t.name }}</div>
-        </a>
-        {% endfor %}
-      </div>
-    </section>
-    {% endif %}
-
-    {% if results.categories %}
-    <section class="mb-3">
-      <h2 class="section-title">Categories</h2>
-      <div style="display:flex; flex-direction:column; gap:0.5rem;">
-        {% for c in results.categories %}
-        <a href="{% url 'category-detail' c.pk %}" class="question-card" style="text-decoration:none;">
-          <div style="font-weight:500;">{{ c.name }}</div>
-          <div class="topic-card-meta">{{ c.topic.name }}</div>
-        </a>
-        {% endfor %}
-      </div>
-    </section>
-    {% endif %}
-
+    <!-- Questions -->
     {% if results.questions %}
-    <section>
-      <h2 class="section-title">Questions</h2>
-      <div style="display:flex; flex-direction:column; gap:0.75rem;">
+    <div class="mb-5">
+      <h2 class="h5 fw-bold mb-3">
+        <i class="bi bi-question-circle me-2 text-primary"></i>
+        Questions <span class="badge bg-primary ms-1">{{ results.questions|length }}</span>
+      </h2>
+      <div class="d-flex flex-column gap-2">
         {% for q in results.questions %}
-        <a href="{% url 'question-detail' q.pk %}" class="question-card" style="text-decoration:none;">
-          <div style="font-weight:500;">{{ q.title|truncatechars:150 }}</div>
-          <div class="topic-card-meta">{{ q.subcategory.category.topic.name }} → {{ q.subcategory.name }} · {{ q.answers.count }} answers</div>
+        <a href="{% url 'question-detail' q.pk %}" class="question-card text-decoration-none">
+          <div class="fw-semibold text-dark mb-1">{{ q.title|truncatechars:140 }}</div>
+          <div class="small text-muted d-flex gap-3 flex-wrap">
+            <span class="badge bg-primary bg-opacity-10 text-primary fw-normal">{{ q.subcategory.category.topic.name }}</span>
+            <span>{{ q.subcategory.name }}</span>
+            <span><i class="bi bi-chat me-1"></i>{{ q.answers.count }}</span>
+            <span><i class="bi bi-eye me-1"></i>{{ q.view_count }}</span>
+          </div>
         </a>
         {% endfor %}
       </div>
-    </section>
+    </div>
+    {% endif %}
+
+    <!-- Topics -->
+    {% if results.topics %}
+    <div class="mb-5">
+      <h2 class="h5 fw-bold mb-3">
+        <i class="bi bi-journals me-2 text-info"></i>
+        Topics <span class="badge bg-info ms-1">{{ results.topics|length }}</span>
+      </h2>
+      <div class="row g-3">
+        {% for topic in results.topics %}
+        <div class="col-sm-6 col-md-4">
+          <a href="{% url 'topic-detail' topic.pk %}" class="card topic-card border h-100 text-decoration-none text-dark">
+            <div class="card-body">
+              <div class="fw-semibold">{{ topic.name }}</div>
+              {% if topic.description %}
+              <div class="text-muted small mt-1">{{ topic.description|truncatechars:60 }}</div>
+              {% endif %}
+            </div>
+          </a>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Categories -->
+    {% if results.categories %}
+    <div class="mb-5">
+      <h2 class="h5 fw-bold mb-3">
+        <i class="bi bi-folder2 me-2 text-warning"></i>
+        Categories <span class="badge bg-warning text-dark ms-1">{{ results.categories|length }}</span>
+      </h2>
+      <div class="row g-3">
+        {% for cat in results.categories %}
+        <div class="col-sm-6 col-md-4">
+          <a href="{% url 'category-detail' cat.pk %}" class="card border h-100 text-decoration-none text-dark topic-card">
+            <div class="card-body">
+              <div class="fw-semibold">{{ cat.name }}</div>
+              <div class="text-muted small">{{ cat.topic.name }}</div>
+            </div>
+          </a>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
     {% endif %}
 
   {% else %}
-    <div class="empty-state">
-      <p>No results found for "<strong>{{ query }}</strong>".</p>
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-search display-4 d-block mb-3"></i>
+      <p>No results found for <strong>"{{ query }}"</strong>.</p>
+      <p class="small">Try different keywords or browse <a href="{% url 'topic-list' %}">all topics</a>.</p>
     </div>
   {% endif %}
+{% else %}
+  <div class="text-center py-5 text-muted">
+    <i class="bi bi-search display-4 d-block mb-3"></i>
+    <p>Enter a search term above to find questions, topics, and categories.</p>
+  </div>
 {% endif %}
 {% endblock %}

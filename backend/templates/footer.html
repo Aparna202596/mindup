@@ -1,16 +1,18 @@
 <footer class="border-top bg-white mt-5 py-4">
-  <div class="container d-flex flex-wrap justify-content-between align-items-center gap-2">
-    <span class="fw-bold text-primary">
-      <i class="bi bi-brain me-1"></i>MindUp
-    </span>
-    <div class="d-flex gap-3 flex-wrap">
+  <div class="container-xl d-flex flex-wrap justify-content-between align-items-center gap-3">
+    <div class="d-flex align-items-center gap-2">
+      <i class="bi bi-brain text-primary fs-5"></i>
+      <span class="fw-bold text-primary">MindUp</span>
+      <span class="text-muted small">© 2025</span>
+    </div>
+    <div class="d-flex gap-4 flex-wrap">
       <a href="{% url 'topic-list' %}"    class="text-muted text-decoration-none small">Topics</a>
       <a href="{% url 'question-list' %}" class="text-muted text-decoration-none small">Questions</a>
       <a href="{% url 'search' %}"        class="text-muted text-decoration-none small">Search</a>
       {% if user.is_authenticated %}
+        <a href="{% url 'favorites' %}"      class="text-muted text-decoration-none small">Favorites</a>
         <a href="{% url 'bulk-qa-upload' %}" class="text-muted text-decoration-none small">Bulk Upload</a>
       {% endif %}
     </div>
-    <span class="text-muted small">© 2025 MindUp</span>
   </div>
 </footer>

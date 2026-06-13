@@ -4,11 +4,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- ── never_cache meta tags (belt + suspenders with server headers) ── -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma"        content="no-cache">
-  <meta http-equiv="Expires"       content="0">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>{% block title %}MindUp{% endblock %}</title>
+
   <!-- Bootstrap 5 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <!-- Bootstrap Icons -->
@@ -17,26 +17,30 @@
   <link rel="stylesheet" href="{% static 'css/style.css' %}">
   {% block extra_css %}{% endblock %}
 </head>
-<body class="bg-light">
+<body class="bg-body-tertiary">
 
   <!-- ── Navbar ─────────────────────────────────────────────────────────── -->
   {% if user.is_authenticated and user.is_admin %}
-    {% include "admin_navbar.html" %}
+    {% include "includes/admin_navbar.html" %}
   {% else %}
-    {% include "navbar.html" %}
+    {% include "includes/navbar.html" %}
   {% endif %}
 
   <!-- ── Main content ───────────────────────────────────────────────────── -->
   <main class="py-4">
-    <div class="container">
+    <div class="container-xl">
 
       <!-- Flash messages -->
       {% if messages %}
-        <div class="mb-3">
+        <div id="flash-messages" class="mb-3">
           {% for msg in messages %}
-            <div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show" role="alert">
-              {{ msg }}
-              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            <div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show d-flex align-items-center gap-2 rounded-3" role="alert">
+              {% if msg.tags == 'success' %}<i class="bi bi-check-circle-fill text-success"></i>
+              {% elif msg.tags == 'danger' %}<i class="bi bi-x-circle-fill text-danger"></i>
+              {% elif msg.tags == 'warning' %}<i class="bi bi-exclamation-triangle-fill text-warning"></i>
+              {% else %}<i class="bi bi-info-circle-fill text-info"></i>{% endif %}
+              <span>{{ msg }}</span>
+              <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
             </div>
           {% endfor %}
         </div>
@@ -47,13 +51,18 @@
   </main>
 
   <!-- ── Footer ─────────────────────────────────────────────────────────── -->
-  {% include "footer.html" %}
+  {% include "includes/footer.html" %}
 
-  <!-- ── Reusable Confirmation Modal ────────────────────────────────────── -->
-  {% include "confirm_modal.html" %}
+  <!-- ── Reusable Confirmation Modal ─────────────────────────────────────── -->
+  {% include "includes/confirm_modal.html" %}
+
+  <!-- ── AJAX Create/Edit Modal ──────────────────────────────────────────── -->
+  {% include "includes/crud_modal.html" %}
 
   <!-- Bootstrap 5 JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- SweetAlert2 -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <!-- Custom JS -->
   <script src="{% static 'js/main.js' %}"></script>
   {% block extra_js %}{% endblock %}

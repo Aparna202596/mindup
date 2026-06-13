@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════════════════
-  main.js — MindUp  (Bootstrap 5 + SweetAlert2)
+   main.js — MindUp  (Bootstrap 5 + SweetAlert2)
    ══════════════════════════════════════════════════════════════════════════ */
 
 // ── CSRF helper ────────────────────────────────────────────────────────────────
@@ -92,7 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!topicId) return;
 
       const res  = await fetch(`/ajax/categories/?topic_id=${topicId}`,
-                              { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                               { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
       const data = await res.json();
       enableSelect(categorySelect, '— Select Category —');
       data.categories.forEach(c => {
@@ -111,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!catId) return;
 
       const res  = await fetch(`/ajax/subcategories/?category_id=${catId}`,
-                              { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                               { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
       const data = await res.json();
       enableSelect(subcatSelect, '— Select Subcategory —');
       data.subcategories.forEach(s => {
@@ -148,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const previewBtn = document.getElementById('previewBtn');
     const submitBtn  = document.getElementById('submitBtn');
     const ready = subcatSelect?.value
-              && rawText?.value.trim().length > 20;
+               && rawText?.value.trim().length > 20;
 
     if (previewBtn) previewBtn.disabled = !ready;
     if (submitBtn)  submitBtn.disabled  = !ready;

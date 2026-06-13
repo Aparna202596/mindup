@@ -36,6 +36,7 @@ def parse_bulk_text(raw_text: str) -> list[dict]:
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Strategy 1 — Explicit Q: / A: markers
+# FIX: use re.finditer() so we get the full match span and never lose chars
 # ══════════════════════════════════════════════════════════════════════════════
 
 _EXPLICIT_BLOCK = re.compile(
@@ -58,6 +59,7 @@ def _parse_explicit_qa_markers(text: str) -> list[dict]:
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Strategy 2 — Numbered questions with explicit "Answer:" label
+# FIX: same finditer approach
 # ══════════════════════════════════════════════════════════════════════════════
 
 _NUM_BLOCK = re.compile(
@@ -80,6 +82,7 @@ def _parse_numbered_with_answer_label(text: str) -> list[dict]:
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Strategy 3 — Numbered pairs (no explicit Answer: label)
+# FIX: use full line content, no prepended newline trick
 # ══════════════════════════════════════════════════════════════════════════════
 
 _NUMBERED_LINE = re.compile(r"^\s*(\d+)[\.\)]\s+(.{5,})")
@@ -117,6 +120,7 @@ def _parse_numbered_pairs(text: str) -> list[dict]:
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Strategy 4 — Blank-line paragraph pairs
+# FIX: use text directly (no strip() that drops leading content)
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _parse_paragraph_pairs(text: str) -> list[dict]:

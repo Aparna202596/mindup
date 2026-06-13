@@ -19,8 +19,8 @@
             <i class="bi bi-search"></i>
           </span>
           <input class="form-control border-start-0 ps-0" type="search" name="q"
-                  placeholder="Search questions, topics…"
-                  value="{{ request.GET.q|default:'' }}" autocomplete="off">
+                 placeholder="Search questions, topics…"
+                 value="{{ request.GET.q|default:'' }}" autocomplete="off">
         </div>
       </form>
 
@@ -65,7 +65,7 @@
           {% if user.is_staff %}
           <li class="nav-item">
             <a class="nav-link fw-semibold" href="{% url 'admin-dashboard' %}"
-                style="color:#f59e0b;">
+               style="color:#f59e0b;">
               <i class="bi bi-shield-check me-1"></i>Admin
             </a>
           </li>

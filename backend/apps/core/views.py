@@ -251,7 +251,7 @@ def topic_detail_view(request, pk):
     fav_subcat_ids = _user_favorite_ids(request.user, "subcategory")
     fav_q_ids      = _user_favorite_ids(request.user, "question")
 
-    return render(request, "topic_detail.html", {
+    return render(request, "detail_unified.html", {
         "topic":         topic,
         "categories":    categories,
         "is_admin":      is_admin,
@@ -412,7 +412,7 @@ def category_detail_view(request, pk):
     fav_subcat_ids = _user_favorite_ids(request.user, "subcategory")
     fav_q_ids      = _user_favorite_ids(request.user, "question")
 
-    return render(request, "category_detail.html", {
+    return render(request, "detail_unified.html", {
         "category":      category,
         "subcategories": subcategories,
         "is_admin":      is_admin,
@@ -548,7 +548,7 @@ def subcategory_detail_view(request, pk):
     page_obj  = paginator.get_page(request.GET.get("page", 1))
     fav_q_ids = _user_favorite_ids(request.user, "question")
 
-    return render(request, "subcategory_detail.html", {
+    return render(request, "detail_unified.html", {
         "subcategory": sub,
         "questions":   page_obj,
         "page_obj":    page_obj,
