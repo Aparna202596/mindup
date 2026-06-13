@@ -1,0 +1,501 @@
+{% extends "base.html" %}
+    {% block title %}Admin Dashboard — MindUp{% endblock %}
+
+    {% block content %}
+    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div>
+        <h1 class="h3 fw-bold mb-0">
+        <i class="bi bi-speedometer2 me-2 text-primary"></i>Admin Dashboard
+        </h1>
+        <p class="text-muted small mb-0">Manage all content, users, and approvals</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <button class="btn btn-primary btn-sm" data-crud-action="create" data-crud-type="topic">
+        <i class="bi bi-plus-lg me-1"></i>New Topic
+        </button>
+        <button class="btn btn-outline-primary btn-sm" data-crud-action="create" data-crud-type="category">
+        <i class="bi bi-plus-lg me-1"></i>New Category
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" data-crud-action="create" data-crud-type="subcategory">
+        <i class="bi bi-plus-lg me-1"></i>New Subcategory
+        </button>
+        <a href="{% url 'bulk-qa-upload' %}" class="btn btn-success btn-sm">
+        <i class="bi bi-cloud-upload me-1"></i>Bulk Upload
+        </a>
+    </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="row g-3 mb-4">
+    {% with stats_list=stats.items %}
+    <div class="col-6 col-sm-4 col-md-2">
+        <div class="stat-card text-center">
+        <div class="stat-number text-primary">{{ stats.topics }}</div>
+        <div class="stat-label"><i class="bi bi-journals me-1"></i>Topics</div>
+        </div>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+        <div class="stat-card text-center">
+        <div class="stat-number text-info">{{ stats.categories }}</div>
+        <div class="stat-label"><i class="bi bi-folder2 me-1"></i>Categories</div>
+        </div>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+        <div class="stat-card text-center">
+        <div class="stat-number text-secondary">{{ stats.subcategories }}</div>
+        <div class="stat-label"><i class="bi bi-folder-symlink me-1"></i>Subcategories</div>
+        </div>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+        <div class="stat-card text-center">
+        <div class="stat-number text-success">{{ stats.questions }}</div>
+        <div class="stat-label"><i class="bi bi-question-circle me-1"></i>Questions</div>
+        </div>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+        <div class="stat-card text-center">
+        <div class="stat-number text-warning">{{ stats.answers }}</div>
+        <div class="stat-label"><i class="bi bi-chat-text me-1"></i>Answers</div>
+        </div>
+    </div>
+    <div class="col-6 col-sm-4 col-md-2">
+        <div class="stat-card text-center">
+        <div class="stat-number text-danger">{{ stats.pending_approvals }}</div>
+        <div class="stat-label"><i class="bi bi-clock-history me-1"></i>Pending</div>
+        </div>
+    </div>
+    {% endwith %}
+    </div>
+
+    <div class="row g-4">
+    <!-- ── Pending Approvals ────────────────────────────────────────────────── -->
+    {% if pending %}
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+        <div class="card-header bg-warning bg-opacity-10 border-0 d-flex align-items-center gap-2">
+            <i class="bi bi-hourglass-split text-warning"></i>
+            <span class="fw-semibold">Pending Approvals</span>
+            <span class="badge bg-warning text-dark ms-1">{{ pending|length }}</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                <tr>
+                    <th>Type</th><th>Requested by</th><th>Submitted</th><th class="text-end">Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for item in pending %}
+                <tr id="approval-row-{{ item.pk }}">
+                    <td>
+                    <span class="badge bg-light text-dark border">{{ item.object_type }}</span>
+                    </td>
+                    <td>{{ item.requested_by.email }}</td>
+                    <td class="text-muted small">{{ item.created_at|date:"M d, Y H:i" }}</td>
+                    <td class="text-end">
+                    <form method="post" action="{% url 'approve-item' item.pk %}" class="d-inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="approve">
+                        <button class="btn btn-success btn-sm">
+                        <i class="bi bi-check-lg me-1"></i>Approve
+                        </button>
+                    </form>
+                    <form method="post" action="{% url 'approve-item' item.pk %}" class="d-inline ms-1">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="reject">
+                        <button class="btn btn-danger btn-sm">
+                        <i class="bi bi-x-lg me-1"></i>Reject
+                        </button>
+                    </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+        </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ── Content Tabs ────────────────────────────────────────────────────── -->
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+        <div class="card-header border-0 bg-white pt-3 pb-0">
+            <ul class="nav nav-tabs card-header-tabs" id="contentTabs">
+            {% for tab_id, tab_label in tab_list %}
+            <li class="nav-item">
+                <a class="nav-link {% if tab == tab_id %}active{% endif %}"
+                href="?tab={{ tab_id }}">
+                {{ tab_label }}
+                </a>
+            </li>
+            {% endfor %}
+            </ul>
+        </div>
+
+        <div class="card-body p-0">
+            <!-- Search bar -->
+            <div class="p-3 border-bottom bg-light">
+            <div class="input-group input-group-sm" style="max-width:320px;">
+                <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+                <input type="text" class="form-control" id="tableSearch" placeholder="Filter…">
+            </div>
+            </div>
+
+            <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" id="contentTable">
+                <thead class="table-light">
+                <tr>
+                    <th>Name / Title</th>
+                    <th>Status</th>
+                    <th>Hierarchy</th>
+                    <th>Created</th>
+                    <th class="text-end" style="min-width:200px;">Actions</th>
+                </tr>
+                </thead>
+                <tbody id="contentTableBody">
+                {% for item in items %}
+                <tr class="content-row" id="row-{{ item.pk }}"
+                    data-name="{% if tab == 'questions' %}{{ item.title|lower }}{% else %}{{ item.name|lower }}{% endif %}">
+                    <td class="fw-medium">
+                    {% if tab == "topics" %}
+                        <a href="{% url 'topic-detail' item.pk %}" class="text-decoration-none">{{ item.name }}</a>
+                        {% if item.is_hidden %}<span class="badge bg-secondary ms-1"><i class="bi bi-eye-slash"></i> Hidden</span>{% endif %}
+                    {% elif tab == "categories" %}
+                        <a href="{% url 'category-detail' item.pk %}" class="text-decoration-none">{{ item.name }}</a>
+                        {% if item.is_hidden %}<span class="badge bg-secondary ms-1"><i class="bi bi-eye-slash"></i> Hidden</span>{% endif %}
+                    {% elif tab == "subcategories" %}
+                        {{ item.name }}
+                        {% if item.is_hidden %}<span class="badge bg-secondary ms-1"><i class="bi bi-eye-slash"></i> Hidden</span>{% endif %}
+                    {% elif tab == "questions" %}
+                        <a href="{% url 'question-detail' item.pk %}" class="text-decoration-none small">{{ item.title|truncatechars:80 }}</a>
+                        {% if item.is_hidden %}<span class="badge bg-secondary ms-1"><i class="bi bi-eye-slash"></i> Hidden</span>{% endif %}
+                    {% elif tab == "answers" %}
+                        <span class="small text-muted">{{ item.content|truncatechars:80 }}</span>
+                    {% elif tab == "bulk_uploads" %}
+                        <span class="small">{{ item.uploaded_by.email }}</span>
+                    {% endif %}
+                    </td>
+
+                    <td>
+                    {% if tab in "topics categories subcategories" %}
+                        <span class="badge badge-{{ item.status }}">{{ item.status|title }}</span>
+                    {% elif tab == "bulk_uploads" %}
+                        <span class="badge badge-approved">{{ item.questions_created }} Q</span>
+                    {% else %}
+                        —
+                    {% endif %}
+                    </td>
+
+                    <td class="small text-muted">
+                    {% if tab == "categories" %}{{ item.topic.name }}
+                    {% elif tab == "subcategories" %}{{ item.category.topic.name }} / {{ item.category.name }}
+                    {% elif tab == "questions" %}{{ item.subcategory.category.topic.name }} / {{ item.subcategory.name }}
+                    {% elif tab == "answers" %}<a href="{% url 'question-detail' item.question.pk %}" class="text-muted">{{ item.question.title|truncatechars:50 }}</a>
+                    {% elif tab == "bulk_uploads" %}{{ item.subcategory.category.topic.name|default:"—" }}
+                    {% else %}—
+                    {% endif %}
+                    </td>
+
+                    <td class="small text-muted">{{ item.created_at|date:"M d, Y" }}</td>
+
+                    <td class="text-end">
+                    <div class="btn-group btn-group-sm" role="group">
+                        {% if tab != "answers" and tab != "bulk_uploads" %}
+
+                        <!-- Edit -->
+                        <button class="btn btn-outline-primary"
+                                title="Edit"
+                                data-crud-action="edit"
+                                data-crud-type="{{ tab|slice:':-1' }}"
+                                data-crud-id="{{ item.pk }}">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+
+                        <!-- Hide / Unhide -->
+                        {% if item.is_hidden %}
+                        <button class="btn btn-outline-success ajax-unhide"
+                                title="Unhide"
+                                data-type="{{ tab|slice:':-1' }}"
+                                data-id="{{ item.pk }}"
+                                data-name="{% if tab == 'questions' %}{{ item.title|truncatechars:60 }}{% else %}{{ item.name }}{% endif %}">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        {% else %}
+                        <button class="btn btn-outline-warning ajax-hide"
+                                title="Hide"
+                                data-type="{{ tab|slice:':-1' }}"
+                                data-id="{{ item.pk }}"
+                                data-name="{% if tab == 'questions' %}{{ item.title|truncatechars:60 }}{% else %}{{ item.name }}{% endif %}">
+                            <i class="bi bi-eye-slash"></i>
+                        </button>
+                        {% endif %}
+
+                        {% elif tab == "answers" %}
+                        <a href="{% url 'answer-edit' item.pk %}" class="btn btn-outline-primary" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        {% endif %}
+
+                        <!-- Delete -->
+                        <button class="btn btn-outline-danger ajax-delete"
+                                title="Delete"
+                                data-type="{% if tab == 'bulk_uploads' %}bulk_upload{% else %}{{ tab|slice:':-1' }}{% endif %}"
+                                data-id="{{ item.pk }}"
+                                data-name="{% if tab == 'questions' %}{{ item.title|truncatechars:60 }}{% elif tab == 'answers' %}Answer{% elif tab == 'bulk_uploads' %}this upload{% else %}{{ item.name }}{% endif %}">
+                        <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center py-5 text-muted">
+                    <i class="bi bi-inbox display-6 d-block mb-2"></i>
+                    No {{ tab }} found.
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            </div>
+        </div>
+        </div>
+    </div>
+    </div>
+    {% endblock %}
+
+    {% block extra_js %}
+    <script>
+    // ── Table search filter ───────────────────────────────────────────────────
+    document.getElementById('tableSearch')?.addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    document.querySelectorAll('.content-row').forEach(row => {
+        row.style.display = row.dataset.name?.includes(q) ? '' : 'none';
+    });
+    });
+
+    // ── AJAX Hide ──────────────────────────────────────────────────────────────
+    document.querySelectorAll('.ajax-hide').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        const type = this.dataset.type;
+        const id   = this.dataset.id;
+        const name = this.dataset.name;
+
+        const result = await Swal.fire({
+        title: `Hide "${name}"?`,
+        html: `This will also hide all child items. They won't be visible to users.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#f59e0b',
+        confirmButtonText: '<i class="bi bi-eye-slash me-1"></i>Hide it',
+        cancelButtonText: 'Cancel',
+        });
+        if (!result.isConfirmed) return;
+
+        const resp = await fetch(`/ajax/${type}s/${id}/hide/`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest'},
+        });
+        const data = await resp.json();
+        if (data.success) {
+        showToast(data.message, 'warning');
+        setTimeout(() => location.reload(), 800);
+        } else {
+        showToast(data.error, 'danger');
+        }
+    });
+    });
+
+    // ── AJAX Unhide ────────────────────────────────────────────────────────────
+    document.querySelectorAll('.ajax-unhide').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        const type = this.dataset.type;
+        const id   = this.dataset.id;
+        const name = this.dataset.name;
+
+        const resp = await fetch(`/ajax/${type}s/${id}/unhide/`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest'},
+        });
+        const data = await resp.json();
+        if (data.success) {
+        showToast(data.message, 'success');
+        setTimeout(() => location.reload(), 800);
+        } else {
+        Swal.fire('Cannot Unhide', data.error, 'error');
+        }
+    });
+    });
+
+    // ── AJAX Delete ────────────────────────────────────────────────────────────
+    document.querySelectorAll('.ajax-delete').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        const type = this.dataset.type;
+        const id   = this.dataset.id;
+        const name = this.dataset.name;
+
+        const result = await Swal.fire({
+        title: `Delete "${name}"?`,
+        html: `<span class="text-danger">This is permanent and cascades to all children.</span>`,
+        icon: 'error',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: '<i class="bi bi-trash me-1"></i>Yes, delete permanently',
+        cancelButtonText: 'Cancel',
+        });
+        if (!result.isConfirmed) return;
+
+        const url  = getDeleteUrl(type, id);
+        const resp = await fetch(url, {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest'},
+        });
+        const data = await resp.json();
+        if (data.success) {
+        showToast(data.message, 'success');
+        document.getElementById(`row-${id}`)?.remove();
+        } else {
+        showToast(data.error || 'Delete failed', 'danger');
+        }
+    });
+    });
+
+    function getDeleteUrl(type, id) {
+    const map = {
+        'topic': `/ajax/topics/${id}/delete/`,
+        'category': `/ajax/categories/${id}/delete/`,
+        'subcategory': `/ajax/subcategories/${id}/delete/`,
+        'question': `/ajax/questions/${id}/delete/`,
+        'answer': `/answers/${id}/delete/`,
+        'bulk_upload': `/answers/${id}/delete/`,
+    };
+    return map[type] || '#';
+    }
+
+    // ── AJAX Edit / Create modal ───────────────────────────────────────────────
+    document.querySelectorAll('[data-crud-action]').forEach(btn => {
+    btn.addEventListener('click', () => openCrudModal(btn.dataset.crudAction, btn.dataset.crudType, btn.dataset.crudId));
+    });
+
+    async function openCrudModal(action, type, id) {
+    const modal    = bootstrap.Modal.getOrCreateInstance(document.getElementById('crudModal'));
+    const titleEl  = document.getElementById('crudModalTitleText');
+    const bodyEl   = document.getElementById('crudModalBody');
+    const saveBtn  = document.getElementById('crudModalSaveBtn');
+
+    titleEl.textContent = `${action === 'edit' ? 'Edit' : 'Create'} ${type.charAt(0).toUpperCase() + type.slice(1)}`;
+    bodyEl.innerHTML    = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
+    modal.show();
+
+    let fields = getFieldsForType(type);
+    let currentData = {};
+
+    if (action === 'edit' && id) {
+        const url = `/ajax/${type}s/${id}/edit/`;
+        const resp = await fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+        currentData = await resp.json();
+    }
+
+    bodyEl.innerHTML = buildForm(fields, currentData, type);
+    // Load dependent selects if needed
+    if (type === 'category' && currentData.topic_id) await loadCategoryOptions(currentData);
+    if (type === 'subcategory' && currentData.category_id) await loadSubcatOptions(currentData);
+
+    saveBtn.onclick = async () => {
+        const spinner  = document.getElementById('crudSaveSpinner');
+        const saveTxt  = document.getElementById('crudSaveBtnText');
+        spinner.classList.remove('d-none');
+        saveTxt.textContent = 'Saving…';
+
+        const url = action === 'edit'
+        ? `/ajax/${type}s/${id}/edit/`
+        : `/ajax/${type}s/create/`;
+
+        const formData = new FormData(document.getElementById('crudInlineForm'));
+        const resp = await fetch(url, {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest'},
+        body: formData,
+        });
+        const data = await resp.json();
+        spinner.classList.add('d-none');
+        saveTxt.textContent = 'Save';
+
+        if (data.success) {
+        modal.hide();
+        showToast(data.message, 'success');
+        setTimeout(() => location.reload(), 600);
+        } else {
+        bodyEl.insertAdjacentHTML('afterbegin',
+            `<div class="alert alert-danger rounded-3 py-2 px-3 small">${data.error || JSON.stringify(data)}</div>`);
+        }
+    };
+    }
+
+    function getFieldsForType(type) {
+    const map = {
+        'topic':       [{name:'name',label:'Name',type:'text'}, {name:'description',label:'Description',type:'textarea'}, {name:'status',label:'Status',type:'status_select'}],
+        'category':    [{name:'topic',label:'Topic',type:'topic_select'}, {name:'name',label:'Name',type:'text'}, {name:'description',label:'Description',type:'textarea'}, {name:'status',label:'Status',type:'status_select'}],
+        'subcategory': [{name:'category',label:'Category',type:'category_select'}, {name:'name',label:'Name',type:'text'}, {name:'status',label:'Status',type:'status_select'}],
+    };
+    return map[type] || [];
+    }
+
+    function buildForm(fields, data, type) {
+    let html = `<form id="crudInlineForm">`;
+    for (const f of fields) {
+        html += `<div class="mb-3"><label class="form-label fw-medium">${f.label}</label>`;
+        if (f.type === 'text') {
+        html += `<input type="text" name="${f.name}" class="form-control" value="${(data[f.name]||'').replace(/"/g,'&quot;')}" required>`;
+        } else if (f.type === 'textarea') {
+        html += `<textarea name="${f.name}" class="form-control" rows="3">${data[f.name]||''}</textarea>`;
+        } else if (f.type === 'status_select') {
+        const statuses = ['pending','approved','rejected'];
+        html += `<select name="${f.name}" class="form-select">`;
+        statuses.forEach(s => html += `<option value="${s}" ${data.status===s?'selected':''}>${s.charAt(0).toUpperCase()+s.slice(1)}</option>`);
+        html += `</select>`;
+        } else if (f.type === 'topic_select') {
+        html += `<select name="${f.name}" class="form-select" id="modal_topic" onchange="loadCategoryModal(this.value)"><option value="">— Select Topic —</option></select>`;
+        } else if (f.type === 'category_select') {
+        html += `<select name="${f.name}" class="form-select" id="modal_category"><option value="">— Select Category —</option></select>`;
+        }
+        html += `</div>`;
+    }
+    html += `</form>`;
+    // Load topics into select
+    setTimeout(() => loadTopicsModal(data.topic_id, data.category_id), 50);
+    return html;
+    }
+
+    async function loadTopicsModal(selectedTopicId, selectedCatId) {
+    const sel = document.getElementById('modal_topic');
+    if (!sel) return;
+    const resp = await fetch(`/ajax/categories/?topic_id=x`);  // get topics differently
+    // Use existing topic selects already on page or fetch from a dedicated endpoint
+    // As a workaround, copy options from any existing topic select on page
+    const src = document.querySelector('select[name="topic"]') || document.querySelector('#id_topic');
+    if (src) {
+        Array.from(src.options).forEach(o => {
+        const opt = new Option(o.text, o.value, false, o.value === selectedTopicId);
+        sel.add(opt);
+        });
+        if (selectedTopicId) await loadCategoryModal(selectedTopicId, selectedCatId);
+    }
+    }
+
+    async function loadCategoryModal(topicId, selectedCatId) {
+    const sel = document.getElementById('modal_category');
+    if (!sel) return;
+    sel.innerHTML = '<option>Loading…</option>';
+    const resp = await fetch(`/ajax/categories/?topic_id=${topicId}`);
+    const data = await resp.json();
+    sel.innerHTML = '<option value="">— Select Category —</option>';
+    data.categories.forEach(c => {
+        sel.insertAdjacentHTML('beforeend', `<option value="${c.id}" ${c.id===selectedCatId?'selected':''}>${c.name}</option>`);
+    });
+    }
+    </script>
+{% endblock %}

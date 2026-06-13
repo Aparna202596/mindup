@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+    {% block title %}Topics — MindUp{% endblock %}
+
+    {% block content %}
+    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
+    <div>
+        <h1 class="h3 fw-bold mb-0"><i class="bi bi-journals me-2 text-primary"></i>Topics</h1>
+        <p class="text-muted small mb-0">Browse all knowledge areas</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+        <form method="get" class="d-flex gap-2">
+        <div class="input-group input-group-sm" style="width:220px;">
+            <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+            <input type="text" name="q" class="form-control" placeholder="Search topics…"
+                value="{{ search_query }}">
+        </div>
+        <button class="btn btn-outline-secondary btn-sm" type="submit">Go</button>
+        </form>
+        {% if is_admin %}
+        <button class="btn btn-primary btn-sm" data-crud-action="create" data-crud-type="topic">
+        <i class="bi bi-plus-lg me-1"></i>New Topic
+        </button>
+        {% endif %}
+    </div>
+    </div>
+
+    {% if topics %}
+    <div class="row g-3">
+    {% for topic in topics %}
+    <div class="col-sm-6 col-md-4 col-lg-3">
+        <div class="card topic-card border h-100 {% if topic.is_hidden %}opacity-60{% endif %}" id="row-{{ topic.pk }}">
+        <div class="card-body d-flex flex-column">
+            <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
+            <a href="{% url 'topic-detail' topic.pk %}" class="fw-semibold text-decoration-none text-dark flex-grow-1">
+                <i class="bi bi-journals me-2 text-primary opacity-60"></i>{{ topic.name }}
+            </a>
+            {% if user.is_authenticated %}
+            <button class="btn btn-link p-0 fav-btn flex-shrink-0"
+                    data-content-type="topic" data-object-id="{{ topic.pk }}">
+                <i class="bi bi-star{% if topic.pk in fav_ids %}-fill text-warning{% else %} text-muted{% endif %}"></i>
+            </button>
+            {% endif %}
+            </div>
+
+            {% if topic.description %}
+            <p class="text-muted small mb-2 flex-grow-1">{{ topic.description|truncatechars:70 }}</p>
+            {% endif %}
+
+            <div class="d-flex align-items-center justify-content-between mt-auto">
+            <div class="d-flex gap-2 align-items-center">
+                <span class="badge badge-{{ topic.status }}">{{ topic.status|title }}</span>
+                {% if topic.is_hidden %}
+                <span class="badge bg-secondary"><i class="bi bi-eye-slash"></i></span>
+                {% endif %}
+                <span class="text-muted small">
+                <i class="bi bi-folder2 me-1"></i>{{ topic.categories.count }}
+                </span>
+            </div>
+            {% if is_admin %}
+            <div class="d-flex gap-1">
+                <button class="btn btn-outline-primary btn-sm" data-crud-action="edit" data-crud-type="topic" data-crud-id="{{ topic.pk }}"><i class="bi bi-pencil"></i></button>
+                {% if topic.is_hidden %}
+                <button class="btn btn-outline-success btn-sm ajax-unhide" data-type="topic" data-id="{{ topic.pk }}" data-name="{{ topic.name }}"><i class="bi bi-eye"></i></button>
+                {% else %}
+                <button class="btn btn-outline-warning btn-sm ajax-hide" data-type="topic" data-id="{{ topic.pk }}" data-name="{{ topic.name }}"><i class="bi bi-eye-slash"></i></button>
+                {% endif %}
+                <button class="btn btn-outline-danger btn-sm ajax-delete" data-type="topic" data-id="{{ topic.pk }}" data-name="{{ topic.name }}"><i class="bi bi-trash"></i></button>
+            </div>
+            {% endif %}
+            </div>
+        </div>
+        </div>
+    </div>
+    {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <nav class="mt-4">
+    <ul class="pagination pagination-sm justify-content-center">
+        {% if page_obj.has_previous %}
+        <li class="page-item"><a class="page-link" href="?{% if search_query %}q={{ search_query }}&{% endif %}page={{ page_obj.previous_page_number }}">«</a></li>
+        {% endif %}
+        {% for num in page_obj.paginator.page_range %}
+        <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+        <a class="page-link" href="?{% if search_query %}q={{ search_query }}&{% endif %}page={{ num }}">{{ num }}</a>
+        </li>
+        {% endfor %}
+        {% if page_obj.has_next %}
+        <li class="page-item"><a class="page-link" href="?{% if search_query %}q={{ search_query }}&{% endif %}page={{ page_obj.next_page_number }}">»</a></li>
+        {% endif %}
+    </ul>
+    </nav>
+    {% endif %}
+
+    {% else %}
+    <div class="text-center py-5 text-muted">
+    <i class="bi bi-journals display-4 d-block mb-3"></i>
+    <p>{% if search_query %}No topics matching "{{ search_query }}".{% else %}No topics available yet.{% endif %}</p>
+    {% if is_admin %}
+    <button class="btn btn-primary" data-crud-action="create" data-crud-type="topic">
+        <i class="bi bi-plus-lg me-1"></i>Create First Topic
+    </button>
+    {% endif %}
+    </div>
+    {% endif %}
+{% endblock %}

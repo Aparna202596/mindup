@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+    {% block title %}My Favorites — MindUp{% endblock %}
+
+    {% block content %}
+    <div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <h1 class="h3 fw-bold mb-0"><i class="bi bi-star-fill me-2 text-warning"></i>My Favorites</h1>
+        <p class="text-muted small mb-0">Content you've saved for quick access</p>
+    </div>
+    <a href="{% url 'user-dashboard' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Dashboard
+    </a>
+    </div>
+
+    {% if not fav_topics and not fav_categories and not fav_subcategories and not fav_questions %}
+    <div class="text-center py-5 text-muted">
+    <i class="bi bi-star display-4 d-block mb-3"></i>
+    <p>You haven't favorited anything yet.</p>
+    <a href="{% url 'topic-list' %}" class="btn btn-primary">Browse Topics</a>
+    </div>
+    {% else %}
+
+    {% if fav_topics %}
+    <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white fw-semibold border-bottom">
+        <i class="bi bi-journals me-2 text-primary"></i>Favorite Topics
+        <span class="badge bg-primary ms-1">{{ fav_topics|length }}</span>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+        {% for topic in fav_topics %}
+        <div class="col-sm-6 col-md-4">
+            <div class="card border topic-card h-100">
+            <div class="card-body d-flex align-items-center justify-content-between gap-2">
+                <a href="{% url 'topic-detail' topic.pk %}" class="fw-medium text-decoration-none text-dark flex-grow-1">
+                <i class="bi bi-journals me-2 text-primary opacity-50"></i>{{ topic.name }}
+                </a>
+                <button class="btn btn-warning btn-sm fav-btn flex-shrink-0"
+                        data-content-type="topic" data-object-id="{{ topic.pk }}"
+                        title="Remove from favorites">
+                <i class="bi bi-star-fill"></i>
+                </button>
+            </div>
+            </div>
+        </div>
+        {% endfor %}
+        </div>
+    </div>
+    </div>
+    {% endif %}
+
+    {% if fav_categories %}
+    <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white fw-semibold border-bottom">
+        <i class="bi bi-folder2 me-2 text-info"></i>Favorite Categories
+        <span class="badge bg-info ms-1">{{ fav_categories|length }}</span>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+        {% for cat in fav_categories %}
+        <div class="col-sm-6 col-md-4">
+            <div class="card border topic-card h-100">
+            <div class="card-body d-flex align-items-center justify-content-between gap-2">
+                <div class="flex-grow-1">
+                <a href="{% url 'category-detail' cat.pk %}" class="fw-medium text-decoration-none text-dark d-block">
+                    <i class="bi bi-folder2 me-2 text-info opacity-50"></i>{{ cat.name }}
+                </a>
+                <small class="text-muted">{{ cat.topic.name }}</small>
+                </div>
+                <button class="btn btn-warning btn-sm fav-btn flex-shrink-0"
+                        data-content-type="category" data-object-id="{{ cat.pk }}">
+                <i class="bi bi-star-fill"></i>
+                </button>
+            </div>
+            </div>
+        </div>
+        {% endfor %}
+        </div>
+    </div>
+    </div>
+    {% endif %}
+
+    {% if fav_subcategories %}
+    <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white fw-semibold border-bottom">
+        <i class="bi bi-folder-symlink me-2 text-secondary"></i>Favorite Subcategories
+        <span class="badge bg-secondary ms-1">{{ fav_subcategories|length }}</span>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+        {% for sub in fav_subcategories %}
+        <div class="col-sm-6 col-md-4">
+            <div class="card border topic-card h-100">
+            <div class="card-body d-flex align-items-center justify-content-between gap-2">
+                <div class="flex-grow-1">
+                <a href="{% url 'subcategory-detail' sub.pk %}" class="fw-medium text-decoration-none text-dark d-block">
+                    <i class="bi bi-folder-symlink me-2 text-secondary opacity-50"></i>{{ sub.name }}
+                </a>
+                <small class="text-muted">{{ sub.category.topic.name }} / {{ sub.category.name }}</small>
+                </div>
+                <button class="btn btn-warning btn-sm fav-btn flex-shrink-0"
+                        data-content-type="subcategory" data-object-id="{{ sub.pk }}">
+                <i class="bi bi-star-fill"></i>
+                </button>
+            </div>
+            </div>
+        </div>
+        {% endfor %}
+        </div>
+    </div>
+    </div>
+    {% endif %}
+
+    {% if fav_questions %}
+    <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white fw-semibold border-bottom">
+        <i class="bi bi-question-circle me-2 text-success"></i>Favorite Questions
+        <span class="badge bg-success ms-1">{{ fav_questions|length }}</span>
+    </div>
+    <div class="card-body p-0">
+        {% for q in fav_questions %}
+        <div class="d-flex align-items-start justify-content-between gap-2 px-4 py-3 border-bottom">
+        <div class="flex-grow-1">
+            <a href="{% url 'question-detail' q.pk %}" class="fw-medium text-decoration-none text-dark d-block">
+            {{ q.title|truncatechars:100 }}
+            </a>
+            <small class="text-muted">
+            {{ q.subcategory.category.topic.name }} / {{ q.subcategory.name }}
+            · <i class="bi bi-chat"></i> {{ q.answers.count }}
+            </small>
+        </div>
+        <button class="btn btn-warning btn-sm fav-btn flex-shrink-0"
+                data-content-type="question" data-object-id="{{ q.pk }}">
+            <i class="bi bi-star-fill"></i>
+        </button>
+        </div>
+        {% endfor %}
+    </div>
+    </div>
+    {% endif %}
+
+    {% endif %}
+{% endblock %}

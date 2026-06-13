@@ -1,0 +1,88 @@
+{% load static %}
+<nav class="navbar navbar-expand-lg navbar-mu sticky-top" style="background:#fff; border-bottom:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,.06);">
+  <div class="container-xl">
+    <a class="navbar-brand fw-bold text-primary d-flex align-items-center gap-2" href="{% url 'topic-list' %}">
+      <i class="bi bi-brain fs-5"></i>
+      <span>MindUp</span>
+    </a>
+
+    <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" style="box-shadow:none;">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="mainNav">
+      <!-- Search -->
+      <form class="d-flex mx-lg-3 my-2 my-lg-0 flex-grow-1" style="max-width:400px;"
+            method="get" action="{% url 'search' %}">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text bg-white border-end-0 text-muted">
+            <i class="bi bi-search"></i>
+          </span>
+          <input class="form-control border-start-0 ps-0" type="search" name="q"
+                  placeholder="Search questions, topics…"
+                  value="{{ request.GET.q|default:'' }}" autocomplete="off">
+        </div>
+      </form>
+
+      <!-- Nav links -->
+      <ul class="navbar-nav ms-auto align-items-center gap-1">
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'topic-list' %}">
+            <i class="bi bi-journals me-1"></i><span class="d-lg-inline">Topics</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'question-list' %}">
+            <i class="bi bi-question-circle me-1"></i><span class="d-lg-inline">Questions</span>
+          </a>
+        </li>
+
+        {% if user.is_authenticated %}
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'question-create' %}">
+              <i class="bi bi-plus-circle me-1"></i><span class="d-lg-inline">Ask</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'bulk-qa-upload' %}">
+              <i class="bi bi-cloud-upload me-1"></i><span class="d-lg-inline d-none">Bulk Upload</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'favorites' %}">
+              <i class="bi bi-star me-1 text-warning"></i><span class="d-lg-inline d-none">Favorites</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link position-relative" href="{% url 'user-dashboard' %}">
+              <i class="bi bi-speedometer2 me-1"></i>
+              <span class="d-lg-inline">Dashboard</span>
+              {% if user.notifications.filter %}
+                {# notification dot is rendered via JS if needed #}
+              {% endif %}
+            </a>
+          </li>
+          {% if user.is_staff %}
+          <li class="nav-item">
+            <a class="nav-link fw-semibold" href="{% url 'admin-dashboard' %}"
+                style="color:#f59e0b;">
+              <i class="bi bi-shield-check me-1"></i>Admin
+            </a>
+          </li>
+          {% endif %}
+          <li class="nav-item ms-1">
+            <a class="btn btn-outline-danger btn-sm" href="{% url 'account_logout' %}">
+              <i class="bi bi-box-arrow-right"></i>
+            </a>
+          </li>
+        {% else %}
+          <li class="nav-item ms-2">
+            <a class="btn btn-primary btn-sm" href="{% url 'account_login' %}">
+              <i class="bi bi-google me-1"></i>Sign In
+            </a>
+          </li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+</nav>

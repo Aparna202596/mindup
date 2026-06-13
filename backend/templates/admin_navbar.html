@@ -1,0 +1,74 @@
+{% load static %}
+<nav class="navbar navbar-expand-lg navbar-dark sticky-top" style="background:#1e1b4b; box-shadow:0 2px 8px rgba(0,0,0,.25);">
+  <div class="container-xl">
+    <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="{% url 'admin-dashboard' %}">
+      <i class="bi bi-brain fs-5"></i>
+      <span>MindUp</span>
+      <span class="badge bg-warning text-dark ms-1 admin-badge">ADMIN</span>
+    </a>
+
+    <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#adminNav" style="box-shadow:none;">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="adminNav">
+      <!-- Search -->
+      <form class="d-flex mx-lg-3 my-2 my-lg-0 flex-grow-1" style="max-width:380px;"
+            method="get" action="{% url 'search' %}">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text bg-white bg-opacity-10 border-0 text-white">
+            <i class="bi bi-search"></i>
+          </span>
+          <input class="form-control bg-white bg-opacity-10 border-0 text-white placeholder-white"
+                 type="search" name="q"
+                 placeholder="Search…"
+                 value="{{ request.GET.q|default:'' }}" autocomplete="off"
+                 style="color:#fff !important;">
+        </div>
+      </form>
+
+      <ul class="navbar-nav ms-auto align-items-center gap-1">
+        <li class="nav-item">
+          <a class="nav-link opacity-75 hover-opacity-100" href="{% url 'admin-dashboard' %}">
+            <i class="bi bi-speedometer2 me-1"></i>Dashboard
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link opacity-75" href="{% url 'topic-list' %}">
+            <i class="bi bi-journals me-1"></i>Topics
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link opacity-75" href="{% url 'question-list' %}">
+            <i class="bi bi-question-circle me-1"></i>Questions
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link opacity-75" href="{% url 'bulk-qa-upload' %}">
+            <i class="bi bi-cloud-upload me-1"></i>Bulk Upload
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link opacity-75" href="{% url 'audit-log' %}">
+            <i class="bi bi-journal-text me-1"></i>Audit
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link opacity-75" href="{% url 'user-list' %}">
+            <i class="bi bi-people me-1"></i>Users
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link opacity-75" href="{% url 'admin:index' %}">
+            <i class="bi bi-gear me-1"></i>Django
+          </a>
+        </li>
+        <li class="nav-item ms-2">
+          <a class="btn btn-outline-light btn-sm" href="{% url 'account_logout' %}">
+            <i class="bi bi-box-arrow-right me-1"></i>Logout
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>

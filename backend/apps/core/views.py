@@ -1,15 +1,16 @@
-import re
+import json
 import logging
 
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
-from django.urls import reverse_lazy
+from django.urls import reverse_lazy, reverse
 from django.db.models import Q, Count
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.views.generic import ListView, DetailView, CreateView
 from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_POST
 
 from apps.core.decorators import (
     admin_login_required,
@@ -19,7 +20,7 @@ from apps.core.decorators import (
 from apps.core.models import (
     Topic, Category, SubCategory, Question,
     Answer, AnswerPoint, BulkUploadSession,
-    Notification, AuditLog, ApprovalQueue,
+    Notification, AuditLog, ApprovalQueue, Favorite,
 )
 from apps.core.forms import (
     TopicForm, TopicEditForm,
@@ -39,35 +40,54 @@ from apps.core.services.bulk_qa_parser import process_bulk_upload
 logger = logging.getLogger(__name__)
 
 
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def _json_ok(data=None, **kwargs):
+    payload = {"success": True}
+    if data:
+        payload.update(data)
+    payload.update(kwargs)
+    return JsonResponse(payload)
+
+
+def _json_err(message, status=400):
+    return JsonResponse({"success": False, "error": message}, status=status)
+
+
+def _is_ajax(request):
+    return request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
+
+def _user_favorite_ids(user, content_type):
+    if not user.is_authenticated:
+        return set()
+    return set(
+        Favorite.objects.filter(user=user, content_type=content_type)
+        .values_list("object_id", flat=True)
+    )
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # HOME & AUTH REDIRECT
 # ══════════════════════════════════════════════════════════════════════════════
 
 @never_cache
 def home(request):
-    recent_questions = Question.objects.select_related(
-        "subcategory__category__topic", "created_by"
-    ).order_by("-created_at")[:6]
-
-    approved_topics = Topic.objects.filter(status="approved").annotate(
-        cat_count=Count("categories")
-    ).order_by("name")[:8]
-
-    return render(request, "home.html", {
-        "recent_questions":  recent_questions,
-        "approved_topics":   approved_topics,
-        "total_questions":   Question.objects.count(),
-        "total_answers":     Answer.objects.count(),
-        "total_topics":      Topic.objects.filter(status="approved").count(),
-        "total_categories":  Category.objects.filter(status="approved").count(),
-    })
+    """Landing page → redirect to login if not authenticated."""
+    if not request.user.is_authenticated:
+        return redirect("account_login")
+    if request.user.is_superuser:
+        return redirect("admin-dashboard")
+    return redirect("user-dashboard")
 
 
 @never_cache
 def smart_login_redirect(request):
-    if request.user.is_authenticated and getattr(request.user, "is_admin", False):
-        return redirect("admin-dashboard")
-    return redirect("home")
+    if request.user.is_authenticated:
+        if getattr(request.user, "is_admin", False):
+            return redirect("admin-dashboard")
+        return redirect("user-dashboard")
+    return redirect("account_login")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -82,13 +102,13 @@ def search_view(request):
         query = form.cleaned_data.get("q", "")
         if query:
             results = global_search(query)
-    return render(request, "search/search_results.html", {
+    return render(request, "search_results.html", {
         "form": form, "results": results, "query": query,
     })
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# AJAX — Dynamic category / subcategory loading
+# AJAX — Dynamic selects
 # ══════════════════════════════════════════════════════════════════════════════
 
 def ajax_load_categories(request):
@@ -105,7 +125,6 @@ def ajax_load_categories(request):
 
 
 def ajax_load_subcategories(request):
-    """Return JSON list of approved subcategories for a given category_id."""
     cat_id = request.GET.get("category_id", "")
     subs = (
         SubCategory.objects
@@ -119,50 +138,197 @@ def ajax_load_subcategories(request):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TOPICS
+# FAVORITES (AJAX)
 # ══════════════════════════════════════════════════════════════════════════════
 
-class TopicListView(ListView):
-    model              = Topic
-    template_name      = "topics/topic_list.html"
-    context_object_name = "topics"
-    paginate_by        = 12
+@user_login_required()
+def toggle_favorite(request):
+    if request.method != "POST":
+        return _json_err("POST required", 405)
+    try:
+        body         = json.loads(request.body)
+        content_type = body.get("content_type")
+        object_id    = body.get("object_id")
+    except Exception:
+        return _json_err("Invalid JSON")
 
-    def get_queryset(self):
-        qs = Topic.objects.filter(status="approved").order_by("-created_at")
-        q  = self.request.GET.get("q", "")
-        if q:
-            qs = qs.filter(name__icontains=q)
-        return qs
+    VALID_TYPES = {"topic", "category", "subcategory", "question"}
+    if content_type not in VALID_TYPES:
+        return _json_err("Invalid content_type")
 
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["search_query"] = self.request.GET.get("q", "")
-        return ctx
-
-
-class TopicDetailView(DetailView):
-    model               = Topic
-    template_name       = "topics/topic_detail.html"
-    context_object_name = "topic"
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["categories"] = self.object.categories.filter(status="approved")
-        return ctx
+    fav, created = Favorite.objects.get_or_create(
+        user=request.user,
+        content_type=content_type,
+        object_id=object_id,
+    )
+    if not created:
+        fav.delete()
+        return _json_ok(favorited=False, message="Removed from favorites")
+    return _json_ok(favorited=True, message="Added to favorites")
 
 
-class TopicCreateView(UserLoginRequiredMixin, CreateView):
-    model        = Topic
-    form_class   = TopicForm
-    template_name = "topics/topic_create.html"
-    success_url  = reverse_lazy("topic-list")
+@user_login_required()
+@never_cache
+def favorites_page(request):
+    user = request.user
+    favs = Favorite.objects.filter(user=user)
 
-    def form_valid(self, form):
-        form.instance.created_by = self.request.user
-        messages.success(self.request, "Topic submitted for approval.")
-        return super().form_valid(form)
+    fav_topic_ids  = set(favs.filter(content_type="topic").values_list("object_id", flat=True))
+    fav_cat_ids    = set(favs.filter(content_type="category").values_list("object_id", flat=True))
+    fav_subcat_ids = set(favs.filter(content_type="subcategory").values_list("object_id", flat=True))
+    fav_q_ids      = set(favs.filter(content_type="question").values_list("object_id", flat=True))
 
+    return render(request, "favorites.html", {
+        "fav_topics":        Topic.objects.filter(id__in=fav_topic_ids),
+        "fav_categories":    Category.objects.filter(id__in=fav_cat_ids).select_related("topic"),
+        "fav_subcategories": SubCategory.objects.filter(id__in=fav_subcat_ids).select_related("category__topic"),
+        "fav_questions":     Question.objects.filter(id__in=fav_q_ids).select_related("subcategory__category__topic"),
+    })
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TOPICS — AJAX CRUD + hide/unhide/delete
+# ══════════════════════════════════════════════════════════════════════════════
+
+@user_login_required()
+@never_cache
+def topic_list_view(request):
+    is_admin = request.user.is_superuser
+    q = request.GET.get("q", "")
+
+    if is_admin:
+        qs = Topic.objects.annotate(
+            q_count=Count("categories__subcategories__questions", distinct=True)
+        ).order_by("-created_at")
+    else:
+        qs = Topic.objects.filter(
+            status="approved", is_hidden=False
+        ).annotate(
+            q_count=Count("categories__subcategories__questions", distinct=True)
+        ).filter(q_count__gt=0).order_by("name")
+
+    if q:
+        qs = qs.filter(name__icontains=q)
+
+    paginator = Paginator(qs, 12)
+    page_obj  = paginator.get_page(request.GET.get("page", 1))
+
+    fav_ids = _user_favorite_ids(request.user, "topic")
+
+    return render(request, "topic_list.html", {
+        "topics":       page_obj,
+        "page_obj":     page_obj,
+        "search_query": q,
+        "is_admin":     is_admin,
+        "fav_ids":      fav_ids,
+    })
+
+
+@user_login_required()
+@never_cache
+def topic_detail_view(request, pk):
+    topic    = get_object_or_404(Topic, pk=pk)
+    is_admin = request.user.is_superuser
+
+    if not is_admin:
+        if topic.status != "approved" or topic.is_hidden:
+            from django.http import Http404
+            raise Http404
+
+    if is_admin:
+        categories = topic.categories.prefetch_related(
+            "subcategories__questions__answers"
+        ).order_by("name")
+    else:
+        categories = topic.categories.filter(
+            status="approved", is_hidden=False
+        ).prefetch_related(
+            "subcategories__questions__answers"
+        ).order_by("name")
+
+    fav_topic_ids  = _user_favorite_ids(request.user, "topic")
+    fav_cat_ids    = _user_favorite_ids(request.user, "category")
+    fav_subcat_ids = _user_favorite_ids(request.user, "subcategory")
+    fav_q_ids      = _user_favorite_ids(request.user, "question")
+
+    return render(request, "topic_detail.html", {
+        "topic":         topic,
+        "categories":    categories,
+        "is_admin":      is_admin,
+        "fav_topic_ids":  fav_topic_ids,
+        "fav_cat_ids":   fav_cat_ids,
+        "fav_subcat_ids": fav_subcat_ids,
+        "fav_q_ids":     fav_q_ids,
+    })
+
+
+@admin_login_required
+def topic_create_ajax(request):
+    if request.method != "POST":
+        return _json_err("POST required", 405)
+    form = TopicForm(request.POST)
+    if form.is_valid():
+        topic            = form.save(commit=False)
+        topic.created_by = request.user
+        topic.status     = "approved"   # admin creates = auto-approved
+        topic.save()
+        create_audit_log(user=request.user, action="CREATE", object_type="Topic",
+                         object_id=topic.id, new_data={"name": topic.name})
+        return _json_ok(id=str(topic.id), name=topic.name, message="Topic created.")
+    return _json_err(str(form.errors))
+
+
+@admin_login_required
+def topic_edit_ajax(request, pk):
+    topic = get_object_or_404(Topic, pk=pk)
+    if request.method == "GET":
+        return JsonResponse({
+            "id": str(topic.id), "name": topic.name,
+            "description": topic.description or "", "status": topic.status,
+        })
+    form = TopicEditForm(request.POST, instance=topic)
+    if form.is_valid():
+        old = {"name": topic.name, "status": topic.status}
+        obj = form.save(commit=False)
+        obj.updated_by = request.user
+        obj.save()
+        create_audit_log(user=request.user, action="EDIT", object_type="Topic",
+                         object_id=topic.id, old_data=old,
+                         new_data={"name": obj.name, "status": obj.status})
+        return _json_ok(name=obj.name, status=obj.status, message="Topic updated.")
+    return _json_err(str(form.errors))
+
+
+@admin_login_required
+@require_POST
+def topic_hide_ajax(request, pk):
+    topic = get_object_or_404(Topic, pk=pk)
+    topic.hide()
+    create_audit_log(user=request.user, action="HIDE", object_type="Topic", object_id=topic.id)
+    return _json_ok(hidden=True, message="Topic and all children hidden.")
+
+
+@admin_login_required
+@require_POST
+def topic_unhide_ajax(request, pk):
+    topic = get_object_or_404(Topic, pk=pk)
+    topic.unhide()
+    create_audit_log(user=request.user, action="UNHIDE", object_type="Topic", object_id=topic.id)
+    return _json_ok(hidden=False, message="Topic unhidden.")
+
+
+@admin_login_required
+@require_POST
+def topic_delete_ajax(request, pk):
+    topic = get_object_or_404(Topic, pk=pk)
+    name  = topic.name
+    create_audit_log(user=request.user, action="DELETE", object_type="Topic",
+                     object_id=topic.id, old_data={"name": name})
+    topic.delete()  # CASCADE deletes all children
+    return _json_ok(message=f'Topic "{name}" permanently deleted.')
+
+
+# ── non-AJAX fallbacks (kept for backward compat) ─────────────────────────────
 
 @admin_login_required
 def topic_edit(request, pk):
@@ -173,14 +339,12 @@ def topic_edit(request, pk):
         obj = form.save(commit=False)
         obj.updated_by = request.user
         obj.save()
-        create_audit_log(
-            user=request.user, action="EDIT", object_type="Topic",
-            object_id=topic.id, old_data=old,
-            new_data={"name": topic.name, "status": topic.status},
-        )
+        create_audit_log(user=request.user, action="EDIT", object_type="Topic",
+                         object_id=topic.id, old_data=old,
+                         new_data={"name": obj.name, "status": obj.status})
         messages.success(request, "Topic updated.")
         return redirect("admin-dashboard")
-    return render(request, "dashboard/edit_form.html", {
+    return render(request, "edit_form.html", {
         "form": form, "title": "Edit Topic", "object": topic,
         "cancel_url": "admin-dashboard",
     })
@@ -190,10 +354,8 @@ def topic_edit(request, pk):
 def topic_delete(request, pk):
     topic = get_object_or_404(Topic, pk=pk)
     if request.method == "POST":
-        create_audit_log(
-            user=request.user, action="DELETE", object_type="Topic",
-            object_id=topic.id, old_data={"name": topic.name},
-        )
+        create_audit_log(user=request.user, action="DELETE", object_type="Topic",
+                         object_id=topic.id, old_data={"name": topic.name})
         topic.delete()
         messages.success(request, "Topic deleted.")
         return redirect("admin-dashboard")
@@ -203,45 +365,131 @@ def topic_delete(request, pk):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# CATEGORIES
+# CATEGORIES — AJAX CRUD + hide/unhide/delete
 # ══════════════════════════════════════════════════════════════════════════════
 
-class CategoryListView(ListView):
-    model               = Category
-    template_name       = "categories/category_list.html"
-    context_object_name = "categories"
-    paginate_by         = 12
+@user_login_required()
+@never_cache
+def category_list_view(request):
+    is_admin = request.user.is_superuser
+    if is_admin:
+        qs = Category.objects.select_related("topic").order_by("-created_at")
+    else:
+        qs = Category.objects.filter(
+            status="approved", is_hidden=False, topic__is_hidden=False
+        ).select_related("topic").order_by("name")
 
-    def get_queryset(self):
-        return (
-            Category.objects
-            .filter(status="approved")
-            .select_related("topic")
-            .order_by("-created_at")
-        )
+    paginator = Paginator(qs, 12)
+    page_obj  = paginator.get_page(request.GET.get("page", 1))
+    fav_ids   = _user_favorite_ids(request.user, "category")
 
-
-class CategoryDetailView(DetailView):
-    model               = Category
-    template_name       = "categories/category_detail.html"
-    context_object_name = "category"
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["subcategories"] = self.object.subcategories.filter(status="approved")
-        return ctx
+    return render(request, "category_list.html", {
+        "categories": page_obj,
+        "page_obj":   page_obj,
+        "is_admin":   is_admin,
+        "fav_ids":    fav_ids,
+    })
 
 
-class CategoryCreateView(UserLoginRequiredMixin, CreateView):
-    model         = Category
-    form_class    = CategoryForm
-    template_name = "categories/category_create.html"
-    success_url   = reverse_lazy("category-list")
+@user_login_required()
+@never_cache
+def category_detail_view(request, pk):
+    category = get_object_or_404(Category, pk=pk)
+    is_admin = request.user.is_superuser
 
-    def form_valid(self, form):
-        form.instance.created_by = self.request.user
-        messages.success(self.request, "Category submitted for approval.")
-        return super().form_valid(form)
+    if not is_admin and (category.status != "approved" or category.is_hidden):
+        from django.http import Http404
+        raise Http404
+
+    if is_admin:
+        subcategories = category.subcategories.prefetch_related("questions__answers").order_by("name")
+    else:
+        subcategories = category.subcategories.filter(
+            status="approved", is_hidden=False
+        ).prefetch_related("questions__answers").order_by("name")
+
+    fav_cat_ids    = _user_favorite_ids(request.user, "category")
+    fav_subcat_ids = _user_favorite_ids(request.user, "subcategory")
+    fav_q_ids      = _user_favorite_ids(request.user, "question")
+
+    return render(request, "category_detail.html", {
+        "category":      category,
+        "subcategories": subcategories,
+        "is_admin":      is_admin,
+        "fav_cat_ids":   fav_cat_ids,
+        "fav_subcat_ids": fav_subcat_ids,
+        "fav_q_ids":     fav_q_ids,
+    })
+
+
+@admin_login_required
+def category_create_ajax(request):
+    if request.method != "POST":
+        return _json_err("POST required", 405)
+    form = CategoryForm(request.POST)
+    if form.is_valid():
+        cat            = form.save(commit=False)
+        cat.created_by = request.user
+        cat.status     = "approved"
+        cat.save()
+        create_audit_log(user=request.user, action="CREATE", object_type="Category",
+                         object_id=cat.id, new_data={"name": cat.name})
+        return _json_ok(id=str(cat.id), name=cat.name, message="Category created.")
+    return _json_err(str(form.errors))
+
+
+@admin_login_required
+def category_edit_ajax(request, pk):
+    cat = get_object_or_404(Category, pk=pk)
+    if request.method == "GET":
+        return JsonResponse({
+            "id": str(cat.id), "name": cat.name,
+            "description": cat.description or "",
+            "status": cat.status, "topic_id": str(cat.topic_id),
+        })
+    form = CategoryEditForm(request.POST, instance=cat)
+    if form.is_valid():
+        old = {"name": cat.name, "status": cat.status}
+        obj = form.save(commit=False)
+        obj.updated_by = request.user
+        obj.save()
+        create_audit_log(user=request.user, action="EDIT", object_type="Category",
+                         object_id=cat.id, old_data=old,
+                         new_data={"name": obj.name, "status": obj.status})
+        return _json_ok(name=obj.name, status=obj.status, message="Category updated.")
+    return _json_err(str(form.errors))
+
+
+@admin_login_required
+@require_POST
+def category_hide_ajax(request, pk):
+    cat = get_object_or_404(Category, pk=pk)
+    cat.hide()
+    create_audit_log(user=request.user, action="HIDE", object_type="Category", object_id=cat.id)
+    return _json_ok(hidden=True, message="Category and all children hidden.")
+
+
+@admin_login_required
+@require_POST
+def category_unhide_ajax(request, pk):
+    cat = get_object_or_404(Category, pk=pk)
+    try:
+        cat.unhide()
+    except ValueError as e:
+        return _json_err(str(e))
+    create_audit_log(user=request.user, action="UNHIDE", object_type="Category", object_id=cat.id)
+    return _json_ok(hidden=False, message="Category unhidden.")
+
+
+@admin_login_required
+@require_POST
+def category_delete_ajax(request, pk):
+    cat  = get_object_or_404(Category, pk=pk)
+    name = cat.name
+    create_audit_log(user=request.user, action="DELETE", object_type="Category",
+                     object_id=cat.id, old_data={"name": name})
+    cat.delete()
+    return _json_ok(message=f'Category "{name}" permanently deleted.')
 
 
 @admin_login_required
@@ -253,16 +501,13 @@ def category_edit(request, pk):
         obj = form.save(commit=False)
         obj.updated_by = request.user
         obj.save()
-        create_audit_log(
-            user=request.user, action="EDIT", object_type="Category",
-            object_id=cat.id, old_data=old,
-            new_data={"name": cat.name, "status": cat.status},
-        )
+        create_audit_log(user=request.user, action="EDIT", object_type="Category",
+                         object_id=cat.id, old_data=old,
+                         new_data={"name": obj.name, "status": obj.status})
         messages.success(request, "Category updated.")
         return redirect("admin-dashboard")
-    return render(request, "dashboard/edit_form.html", {
-        "form": form, "title": "Edit Category", "object": cat,
-        "cancel_url": "admin-dashboard",
+    return render(request, "edit_form.html", {
+        "form": form, "title": "Edit Category", "object": cat, "cancel_url": "admin-dashboard",
     })
 
 
@@ -270,10 +515,8 @@ def category_edit(request, pk):
 def category_delete(request, pk):
     cat = get_object_or_404(Category, pk=pk)
     if request.method == "POST":
-        create_audit_log(
-            user=request.user, action="DELETE", object_type="Category",
-            object_id=cat.id, old_data={"name": cat.name},
-        )
+        create_audit_log(user=request.user, action="DELETE", object_type="Category",
+                         object_id=cat.id, old_data={"name": cat.name})
         cat.delete()
         messages.success(request, "Category deleted.")
         return redirect("admin-dashboard")
@@ -283,20 +526,104 @@ def category_delete(request, pk):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# SUBCATEGORIES
+# SUBCATEGORIES — AJAX CRUD + hide/unhide/delete
 # ══════════════════════════════════════════════════════════════════════════════
 
-class SubCategoryDetailView(DetailView):
-    model               = SubCategory
-    template_name       = "categories/subcategory_detail.html"
-    context_object_name = "subcategory"
+@user_login_required()
+@never_cache
+def subcategory_detail_view(request, pk):
+    sub      = get_object_or_404(SubCategory, pk=pk)
+    is_admin = request.user.is_superuser
 
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["questions"] = self.object.questions.select_related(
-            "created_by"
-        ).order_by("-created_at")
-        return ctx
+    if not is_admin and (sub.status != "approved" or sub.is_hidden):
+        from django.http import Http404
+        raise Http404
+
+    if is_admin:
+        questions = sub.questions.select_related("created_by").prefetch_related("answers").order_by("-created_at")
+    else:
+        questions = sub.questions.filter(is_hidden=False).select_related("created_by").prefetch_related("answers").order_by("-created_at")
+
+    paginator = Paginator(questions, 15)
+    page_obj  = paginator.get_page(request.GET.get("page", 1))
+    fav_q_ids = _user_favorite_ids(request.user, "question")
+
+    return render(request, "subcategory_detail.html", {
+        "subcategory": sub,
+        "questions":   page_obj,
+        "page_obj":    page_obj,
+        "is_admin":    is_admin,
+        "fav_q_ids":   fav_q_ids,
+    })
+
+
+@admin_login_required
+def subcategory_create_ajax(request):
+    if request.method != "POST":
+        return _json_err("POST required", 405)
+    form = SubCategoryForm(request.POST)
+    if form.is_valid():
+        sub            = form.save(commit=False)
+        sub.created_by = request.user
+        sub.status     = "approved"
+        sub.save()
+        create_audit_log(user=request.user, action="CREATE", object_type="SubCategory",
+                         object_id=sub.id, new_data={"name": sub.name})
+        return _json_ok(id=str(sub.id), name=sub.name, message="Subcategory created.")
+    return _json_err(str(form.errors))
+
+
+@admin_login_required
+def subcategory_edit_ajax(request, pk):
+    sub = get_object_or_404(SubCategory, pk=pk)
+    if request.method == "GET":
+        return JsonResponse({
+            "id": str(sub.id), "name": sub.name,
+            "status": sub.status, "category_id": str(sub.category_id),
+        })
+    form = SubCategoryEditForm(request.POST, instance=sub)
+    if form.is_valid():
+        old = {"name": sub.name, "status": sub.status}
+        obj = form.save(commit=False)
+        obj.updated_by = request.user
+        obj.save()
+        create_audit_log(user=request.user, action="EDIT", object_type="SubCategory",
+                         object_id=sub.id, old_data=old,
+                         new_data={"name": obj.name, "status": obj.status})
+        return _json_ok(name=obj.name, status=obj.status, message="Subcategory updated.")
+    return _json_err(str(form.errors))
+
+
+@admin_login_required
+@require_POST
+def subcategory_hide_ajax(request, pk):
+    sub = get_object_or_404(SubCategory, pk=pk)
+    sub.hide()
+    create_audit_log(user=request.user, action="HIDE", object_type="SubCategory", object_id=sub.id)
+    return _json_ok(hidden=True, message="Subcategory and all questions hidden.")
+
+
+@admin_login_required
+@require_POST
+def subcategory_unhide_ajax(request, pk):
+    sub = get_object_or_404(SubCategory, pk=pk)
+    try:
+        sub.unhide()
+    except ValueError as e:
+        return _json_err(str(e))
+    create_audit_log(user=request.user, action="UNHIDE", object_type="SubCategory", object_id=sub.id)
+    return _json_ok(hidden=False, message="Subcategory unhidden.")
+
+
+@admin_login_required
+@require_POST
+def subcategory_delete_ajax(request, pk):
+    sub  = get_object_or_404(SubCategory, pk=pk)
+    name = sub.name
+    create_audit_log(user=request.user, action="DELETE", object_type="SubCategory",
+                     object_id=sub.id, old_data={"name": name})
+    sub.delete()
+    return _json_ok(message=f'Subcategory "{name}" permanently deleted.')
 
 
 @user_login_required()
@@ -316,7 +643,7 @@ def subcategory_create(request, category_pk=None):
         if category:
             return redirect("category-detail", pk=category.pk)
         return redirect("category-list")
-    return render(request, "categories/subcategory_create.html", {
+    return render(request, "subcategory_create.html", {
         "form": form, "preselected_category": category,
     })
 
@@ -330,16 +657,13 @@ def subcategory_edit(request, pk):
         obj = form.save(commit=False)
         obj.updated_by = request.user
         obj.save()
-        create_audit_log(
-            user=request.user, action="EDIT", object_type="SubCategory",
-            object_id=sub.id, old_data=old,
-            new_data={"name": sub.name, "status": sub.status},
-        )
+        create_audit_log(user=request.user, action="EDIT", object_type="SubCategory",
+                         object_id=sub.id, old_data=old,
+                         new_data={"name": obj.name, "status": obj.status})
         messages.success(request, "Subcategory updated.")
         return redirect("admin-dashboard")
-    return render(request, "dashboard/edit_form.html", {
-        "form": form, "title": "Edit Subcategory", "object": sub,
-        "cancel_url": "admin-dashboard",
+    return render(request, "edit_form.html", {
+        "form": form, "title": "Edit Subcategory", "object": sub, "cancel_url": "admin-dashboard",
     })
 
 
@@ -347,10 +671,8 @@ def subcategory_edit(request, pk):
 def subcategory_delete(request, pk):
     sub = get_object_or_404(SubCategory, pk=pk)
     if request.method == "POST":
-        create_audit_log(
-            user=request.user, action="DELETE", object_type="SubCategory",
-            object_id=sub.id, old_data={"name": sub.name},
-        )
+        create_audit_log(user=request.user, action="DELETE", object_type="SubCategory",
+                         object_id=sub.id, old_data={"name": sub.name})
         sub.delete()
         messages.success(request, "Subcategory deleted.")
         return redirect("admin-dashboard")
@@ -360,63 +682,159 @@ def subcategory_delete(request, pk):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# QUESTIONS
+# QUESTIONS — AJAX CRUD + hide/unhide/delete
 # ══════════════════════════════════════════════════════════════════════════════
 
-class QuestionListView(ListView):
-    model               = Question
-    template_name       = "questions/question_list.html"
-    context_object_name = "questions"
-    paginate_by         = 15
-
-    def get_queryset(self):
+@user_login_required()
+@never_cache
+def question_list_view(request):
+    is_admin = request.user.is_superuser
+    if is_admin:
         qs = Question.objects.select_related(
             "subcategory__category__topic", "created_by"
-        ).order_by("-created_at")
+        ).prefetch_related("answers").order_by("-created_at")
+    else:
+        qs = Question.objects.filter(
+            is_hidden=False,
+            subcategory__is_hidden=False,
+            subcategory__category__is_hidden=False,
+            subcategory__category__topic__is_hidden=False,
+        ).select_related(
+            "subcategory__category__topic", "created_by"
+        ).prefetch_related("answers").order_by("-created_at")
 
-        q      = self.request.GET.get("q", "")
-        topic  = self.request.GET.get("topic", "")
-        cat    = self.request.GET.get("category", "")
-        subcat = self.request.GET.get("subcategory", "")
+    q      = request.GET.get("q", "")
+    topic  = request.GET.get("topic", "")
+    cat    = request.GET.get("category", "")
+    subcat = request.GET.get("subcategory", "")
 
-        if q:
-            qs = qs.filter(Q(title__icontains=q) | Q(normalized_title__icontains=q))
-        if topic:
-            qs = qs.filter(subcategory__category__topic_id=topic)
-        if cat:
-            qs = qs.filter(subcategory__category_id=cat)
-        if subcat:
-            qs = qs.filter(subcategory_id=subcat)
-        return qs
+    if q:
+        qs = qs.filter(Q(title__icontains=q) | Q(normalized_title__icontains=q))
+    if topic:
+        qs = qs.filter(subcategory__category__topic_id=topic)
+    if cat:
+        qs = qs.filter(subcategory__category_id=cat)
+    if subcat:
+        qs = qs.filter(subcategory_id=subcat)
 
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["search_query"]    = self.request.GET.get("q", "")
-        ctx["filter_topic"]    = self.request.GET.get("topic", "")
-        ctx["filter_category"] = self.request.GET.get("category", "")
-        ctx["filter_subcat"]   = self.request.GET.get("subcategory", "")
-        ctx["topics"]          = Topic.objects.filter(status="approved").order_by("name")
-        ctx["categories"]      = Category.objects.filter(status="approved").order_by("name")
-        ctx["subcategories"]   = SubCategory.objects.filter(status="approved").order_by("name")
-        return ctx
+    paginator = Paginator(qs, 15)
+    page_obj  = paginator.get_page(request.GET.get("page", 1))
+    fav_q_ids = _user_favorite_ids(request.user, "question")
+
+    return render(request, "question_list.html", {
+        "questions":       page_obj,
+        "page_obj":        page_obj,
+        "search_query":    q,
+        "filter_topic":    topic,
+        "filter_category": cat,
+        "filter_subcat":   subcat,
+        "topics":          Topic.objects.filter(status="approved").order_by("name"),
+        "categories":      Category.objects.filter(status="approved").order_by("name"),
+        "subcategories":   SubCategory.objects.filter(status="approved").order_by("name"),
+        "is_admin":        is_admin,
+        "fav_q_ids":       fav_q_ids,
+    })
 
 
-class QuestionDetailView(DetailView):
-    model               = Question
-    template_name       = "questions/question_detail.html"
-    context_object_name = "question"
+@user_login_required()
+@never_cache
+def question_detail_view(request, pk):
+    question = get_object_or_404(Question, pk=pk)
+    is_admin = request.user.is_superuser
 
-    def get(self, request, *args, **kwargs):
-        obj = self.get_object()
-        Question.objects.filter(pk=obj.pk).update(view_count=obj.view_count + 1)
-        return super().get(request, *args, **kwargs)
+    if not is_admin and question.is_hidden:
+        from django.http import Http404
+        raise Http404
 
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["answers"]     = self.object.answers.prefetch_related("points").select_related("created_by")
-        ctx["answer_form"] = AnswerForm()
-        ctx["point_form"]  = AnswerPointForm()
-        return ctx
+    Question.objects.filter(pk=question.pk).update(view_count=question.view_count + 1)
+
+    answers = question.answers.prefetch_related("points").select_related("created_by")
+    fav_q_ids = _user_favorite_ids(request.user, "question")
+
+    return render(request, "question_detail.html", {
+        "question":    question,
+        "answers":     answers,
+        "answer_form": AnswerForm(),
+        "point_form":  AnswerPointForm(),
+        "is_admin":    is_admin,
+        "fav_q_ids":   fav_q_ids,
+    })
+
+
+@admin_login_required
+def question_create_ajax(request):
+    if request.method != "POST":
+        return _json_err("POST required", 405)
+    form = QuestionForm(request.POST)
+    if form.is_valid():
+        result = create_question(
+            user        = request.user,
+            subcategory = form.cleaned_data["subcategory"],
+            title       = form.cleaned_data["title"],
+        )
+        if result["success"]:
+            create_audit_log(user=request.user, action="CREATE", object_type="Question",
+                             object_id=result["question"].id,
+                             new_data={"title": result["question"].title})
+            return _json_ok(id=str(result["question"].id), message="Question created.")
+        dupes = [{"title": str(d["question"])} for d in result["duplicates"]]
+        return JsonResponse({"success": False, "duplicates": dupes}, status=409)
+    return _json_err(str(form.errors))
+
+
+@admin_login_required
+def question_edit_ajax(request, pk):
+    question = get_object_or_404(Question, pk=pk)
+    if request.method == "GET":
+        return JsonResponse({
+            "id": str(question.id), "title": question.title,
+            "subcategory_id": str(question.subcategory_id),
+        })
+    form = QuestionEditForm(request.POST, instance=question)
+    if form.is_valid():
+        from apps.core.services.duplicate_detector import normalize_question as nq
+        old              = {"title": question.title}
+        obj              = form.save(commit=False)
+        obj.normalized_title = nq(obj.title)
+        obj.updated_by   = request.user
+        obj.save()
+        create_audit_log(user=request.user, action="EDIT", object_type="Question",
+                         object_id=question.id, old_data=old, new_data={"title": obj.title})
+        return _json_ok(title=obj.title, message="Question updated.")
+    return _json_err(str(form.errors))
+
+
+@admin_login_required
+@require_POST
+def question_hide_ajax(request, pk):
+    question = get_object_or_404(Question, pk=pk)
+    question.is_hidden = True
+    question.save(update_fields=["is_hidden"])
+    create_audit_log(user=request.user, action="HIDE", object_type="Question", object_id=question.id)
+    return _json_ok(hidden=True, message="Question hidden.")
+
+
+@admin_login_required
+@require_POST
+def question_unhide_ajax(request, pk):
+    question = get_object_or_404(Question, pk=pk)
+    try:
+        question.unhide()
+    except ValueError as e:
+        return _json_err(str(e))
+    create_audit_log(user=request.user, action="UNHIDE", object_type="Question", object_id=question.id)
+    return _json_ok(hidden=False, message="Question unhidden.")
+
+
+@admin_login_required
+@require_POST
+def question_delete_ajax(request, pk):
+    question = get_object_or_404(Question, pk=pk)
+    title    = question.title[:80]
+    create_audit_log(user=request.user, action="DELETE", object_type="Question",
+                     object_id=question.id, old_data={"title": title})
+    question.delete()
+    return _json_ok(message="Question permanently deleted.")
 
 
 @user_login_required()
@@ -430,28 +848,21 @@ def question_create_view(request):
             title       = form.cleaned_data["title"],
         )
         if result["success"]:
-            create_audit_log(
-                user=request.user, action="CREATE", object_type="Question",
-                object_id=result["question"].id,
-                new_data={"title": result["question"].title},
-            )
+            create_audit_log(user=request.user, action="CREATE", object_type="Question",
+                             object_id=result["question"].id,
+                             new_data={"title": result["question"].title})
             messages.success(request, "Question posted successfully.")
             return redirect("question-detail", pk=result["question"].pk)
         else:
             duplicates = result["duplicates"]
-            messages.warning(request, "Similar questions already exist. Review them before posting.")
-    return render(request, "questions/question_create.html", {
+            messages.warning(request, "Similar questions already exist.")
+    return render(request, "question_create.html", {
         "form": form, "duplicates": duplicates,
     })
 
 
 @user_login_required("core.bulk_upload_question")
 def bulk_qa_upload(request):
-    """
-    Bulk paste-and-upload Q&A view.
-    Admins (superusers) bypass the permission check automatically.
-    Normal users need 'core.bulk_upload_question' permission.
-    """
     form   = BulkQAUploadForm(request.POST or None)
     report = None
 
@@ -459,7 +870,6 @@ def bulk_qa_upload(request):
         subcategory = form.cleaned_data["subcategory"]
         raw_text    = form.cleaned_data["raw_text"]
 
-        # Create session record first
         session = BulkUploadSession.objects.create(
             uploaded_by = request.user,
             topic       = form.cleaned_data["topic"],
@@ -467,7 +877,6 @@ def bulk_qa_upload(request):
             subcategory = subcategory,
             raw_text    = raw_text,
         )
-
         report = process_bulk_upload(
             user        = request.user,
             subcategory = subcategory,
@@ -482,22 +891,17 @@ def bulk_qa_upload(request):
                 f"{report['answers_created']} answer(s) uploaded successfully.",
             )
         if report["duplicates_skipped"]:
-            messages.warning(
-                request,
-                f"⚠ {len(report['duplicates_skipped'])} duplicate(s) were skipped.",
-            )
+            for dup in report["duplicates_skipped"]:
+                messages.warning(
+                    request,
+                    f'"{dup["question"]}" already exists. Please cross-check the answers.',
+                )
         if report.get("errors"):
-            messages.error(
-                request,
-                f"✗ {len(report['errors'])} error(s) occurred during processing.",
-            )
-
-        # Reset form after success for another upload
+            messages.error(request, f"✗ {len(report['errors'])} error(s) occurred.")
         form = BulkQAUploadForm()
 
-    return render(request, "questions/bulk_qa_upload.html", {
-        "form":   form,
-        "report": report,
+    return render(request, "bulk_qa_upload.html", {
+        "form": form, "report": report,
     })
 
 
@@ -506,20 +910,17 @@ def question_edit(request, pk):
     question = get_object_or_404(Question, pk=pk)
     form     = QuestionEditForm(request.POST or None, instance=question)
     if request.method == "POST" and form.is_valid():
-        from apps.core.services.duplicate_detector import normalize_question
-        old      = {"title": question.title}
-        question = form.save(commit=False)
-        question.normalized_title = normalize_question(question.title)
-        question.updated_by       = request.user
-        question.save()
-        create_audit_log(
-            user=request.user, action="EDIT", object_type="Question",
-            object_id=question.id, old_data=old,
-            new_data={"title": question.title},
-        )
+        from apps.core.services.duplicate_detector import normalize_question as nq
+        old              = {"title": question.title}
+        obj              = form.save(commit=False)
+        obj.normalized_title = nq(obj.title)
+        obj.updated_by   = request.user
+        obj.save()
+        create_audit_log(user=request.user, action="EDIT", object_type="Question",
+                         object_id=question.id, old_data=old, new_data={"title": obj.title})
         messages.success(request, "Question updated.")
-        return redirect("question-detail", pk=question.pk)
-    return render(request, "dashboard/edit_form.html", {
+        return redirect("question-detail", pk=obj.pk)
+    return render(request, "edit_form.html", {
         "form": form, "title": "Edit Question", "object": question,
         "cancel_href": f"/questions/{question.pk}/",
     })
@@ -529,10 +930,8 @@ def question_edit(request, pk):
 def question_delete(request, pk):
     question = get_object_or_404(Question, pk=pk)
     if request.method == "POST":
-        create_audit_log(
-            user=request.user, action="DELETE", object_type="Question",
-            object_id=question.id, old_data={"title": question.title},
-        )
+        create_audit_log(user=request.user, action="DELETE", object_type="Question",
+                         object_id=question.id, old_data={"title": question.title})
         question.delete()
         messages.success(request, "Question deleted.")
         return redirect("question-list")
@@ -553,21 +952,19 @@ def answer_create_view(request, question_pk):
     if request.method == "POST" and form.is_valid():
         content = form.cleaned_data["content"]
         if is_duplicate_answer(content, question_pk):
-            messages.warning(request, "A very similar answer already exists for this question.")
-            return render(request, "answers/answer_create.html", {
+            messages.warning(request, "A very similar answer already exists.")
+            return render(request, "answer_create.html", {
                 "form": form, "question": question,
             })
         answer            = form.save(commit=False)
         answer.question   = question
         answer.created_by = request.user
         answer.save()
-        create_audit_log(
-            user=request.user, action="CREATE", object_type="Answer",
-            object_id=answer.id, new_data={"question": str(question.id)},
-        )
+        create_audit_log(user=request.user, action="CREATE", object_type="Answer",
+                         object_id=answer.id, new_data={"question": str(question.id)})
         messages.success(request, "Answer posted.")
         return redirect("question-detail", pk=question.pk)
-    return render(request, "answers/answer_create.html", {
+    return render(request, "answer_create.html", {
         "form": form, "question": question,
     })
 
@@ -581,14 +978,12 @@ def answer_edit(request, pk):
         obj    = form.save(commit=False)
         obj.updated_by = request.user
         obj.save()
-        create_audit_log(
-            user=request.user, action="EDIT", object_type="Answer",
-            object_id=answer.id, old_data=old,
-            new_data={"content": answer.content[:100]},
-        )
+        create_audit_log(user=request.user, action="EDIT", object_type="Answer",
+                         object_id=answer.id, old_data=old,
+                         new_data={"content": answer.content[:100]})
         messages.success(request, "Answer updated.")
         return redirect("question-detail", pk=answer.question.pk)
-    return render(request, "dashboard/edit_form.html", {
+    return render(request, "edit_form.html", {
         "form": form, "title": "Edit Answer", "object": answer,
         "cancel_href": f"/questions/{answer.question.pk}/",
     })
@@ -599,10 +994,8 @@ def answer_delete(request, pk):
     answer      = get_object_or_404(Answer, pk=pk)
     question_pk = answer.question.pk
     if request.method == "POST":
-        create_audit_log(
-            user=request.user, action="DELETE", object_type="Answer",
-            object_id=answer.id,
-        )
+        create_audit_log(user=request.user, action="DELETE", object_type="Answer",
+                         object_id=answer.id)
         answer.delete()
         messages.success(request, "Answer deleted.")
         return redirect("question-detail", pk=question_pk)
@@ -623,7 +1016,7 @@ def answer_point_create_view(request, answer_pk):
         point.save()
         messages.success(request, "Key point added.")
         return redirect("question-detail", pk=answer.question.pk)
-    return render(request, "answers/answerpoint_create.html", {
+    return render(request, "answerpoint_create.html", {
         "form": form, "answer": answer,
     })
 
@@ -637,15 +1030,19 @@ def answer_point_create_view(request, answer_pk):
 def user_dashboard(request):
     if request.user.is_superuser:
         return redirect("admin-dashboard")
-    user             = request.user
-    notification_qs  = Notification.objects.filter(user=user)
-    return render(request, "dashboard/user_dashboard.html", {
+    user            = request.user
+    notification_qs = Notification.objects.filter(user=user)
+
+    return render(request, "user_dashboard.html", {
         "my_questions":    Question.objects.filter(created_by=user).order_by("-created_at")[:5],
         "my_answers":      Answer.objects.filter(created_by=user).select_related("question").order_by("-created_at")[:5],
         "my_bulk_uploads": BulkUploadSession.objects.filter(uploaded_by=user).order_by("-created_at")[:5],
         "my_topics":       Topic.objects.filter(created_by=user).order_by("-created_at")[:5],
         "notifications":   notification_qs.order_by("-created_at")[:10],
         "unread_count":    notification_qs.filter(is_read=False).count(),
+        "total_questions": Question.objects.filter(created_by=user).count(),
+        "total_answers":   Answer.objects.filter(created_by=user).count(),
+        "total_favorites": Favorite.objects.filter(user=user).count(),
     })
 
 
@@ -675,9 +1072,8 @@ def audit_log_view(request):
         logs = logs.filter(action=action_filter)
     if type_filter:
         logs = logs.filter(object_type=type_filter)
-
     page = Paginator(logs, 30).get_page(request.GET.get("page", 1))
-    return render(request, "dashboard/audit_log.html", {
+    return render(request, "audit_log.html", {
         "page":          page,
         "action_filter": action_filter,
         "type_filter":   type_filter,
@@ -686,24 +1082,16 @@ def audit_log_view(request):
     })
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# ADMIN — Content redirect (alias kept for backward compat)
-# ══════════════════════════════════════════════════════════════════════════════
-
 @admin_login_required
 def admin_content_view(request):
     tab = request.GET.get("tab", "topics")
     return redirect(f"/admin-dashboard/?tab={tab}")
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# ADMIN — User management
-# ══════════════════════════════════════════════════════════════════════════════
-
 @admin_login_required
 def user_list_view(request):
     from apps.core.models import CustomUser, Role
-    return render(request, "dashboard/user_list.html", {
+    return render(request, "user_list.html", {
         "users": CustomUser.objects.select_related("role").order_by("-date_joined"),
         "roles": Role.objects.all(),
     })

@@ -57,7 +57,7 @@ def admin_dashboard(request):
     else:
         items = []
 
-    return render(request, "dashboard/admin_dashboard.html", {
+    return render(request, "admin_dashboard.html", {
         "stats": stats,
         "pending": pending,
         "tab": tab,

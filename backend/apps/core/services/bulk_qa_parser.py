@@ -9,9 +9,8 @@ logger = logging.getLogger(__name__)
 # ══════════════════════════════════════════════════════════════════════════════
 
 def parse_bulk_text(raw_text: str) -> list[dict]:
-
-    text = raw_text.strip()
-    if not text:
+    text = raw_text  # Do NOT strip here — preserve leading content
+    if not text.strip():
         return []
 
     for strategy in [
@@ -39,34 +38,21 @@ def parse_bulk_text(raw_text: str) -> list[dict]:
 # Strategy 1 — Explicit Q: / A: markers
 # ══════════════════════════════════════════════════════════════════════════════
 
-_EXPLICIT_Q = re.compile(
-    r"(?:^|\n)\s*Q(?:uestion)?\s*\d*\s*[:\.\)]\s*",
-    re.IGNORECASE,
-)
-_EXPLICIT_A = re.compile(
-    r"\n\s*A(?:nswer)?\s*\d*\s*[:\.\)]\s*",
-    re.IGNORECASE,
+_EXPLICIT_BLOCK = re.compile(
+    r"Q(?:uestion)?\s*\d*\s*[:\.\)]\s*"   # Q: marker
+    r"(.*?)"                                # question text (non-greedy)
+    r"\n\s*A(?:nswer)?\s*\d*\s*[:\.\)]\s*" # A: marker on its own line
+    r"(.*?)(?=\n\s*Q(?:uestion)?\s*\d*\s*[:\.\)]|\Z)",  # answer until next Q: or EOF
+    re.IGNORECASE | re.DOTALL,
 )
 
 def _parse_explicit_qa_markers(text: str) -> list[dict]:
-
-    # Split on Q: / Question: markers
-    q_parts = _EXPLICIT_Q.split("\n" + text)
     results = []
-
-    for part in q_parts[1:]:
-        # Split on A: / Answer: marker (first occurrence only)
-        a_parts = _EXPLICIT_A.split(part, maxsplit=1)
-        if len(a_parts) != 2:
-            continue
-
-        question = a_parts[0].strip()
-        # Trim trailing next Q: marker from the answer (if any)
-        answer_raw = _EXPLICIT_Q.split(a_parts[1])[0].strip()
-
-        if len(question) >= 5 and len(answer_raw) >= 2:
-            results.append({"question": question, "answer": answer_raw})
-
+    for m in _EXPLICIT_BLOCK.finditer(text):
+        question = m.group(1).strip()
+        answer   = m.group(2).strip()
+        if len(question) >= 5 and len(answer) >= 2:
+            results.append({"question": question, "answer": answer})
     return results
 
 
@@ -74,29 +60,21 @@ def _parse_explicit_qa_markers(text: str) -> list[dict]:
 # Strategy 2 — Numbered questions with explicit "Answer:" label
 # ══════════════════════════════════════════════════════════════════════════════
 
-_NUM_Q = re.compile(
-    r"(?:^|\n)\s*(?:Q\s*\d+[\.\):]|Question\s*\d+[\.\):]|\d+[\.\)])\s+",
-    re.IGNORECASE,
-)
-_NUM_A_LABEL = re.compile(
-    r"\n\s*A(?:nswer)?\s*\d*\s*[:\-]\s*",
-    re.IGNORECASE,
+_NUM_BLOCK = re.compile(
+    r"(?:Q\s*\d+[\.\):]|Question\s*\d+[\.\):]|\d+[\.\)])\s+"  # numbered Q marker
+    r"(.*?)"                                                      # question
+    r"\n\s*A(?:nswer)?\s*\d*\s*[:\-]\s*"                         # Answer: label
+    r"(.*?)(?=\n\s*(?:Q\s*\d+[\.\):]|Question\s*\d+[\.\):]|\d+[\.\)])\s|\Z)",
+    re.IGNORECASE | re.DOTALL,
 )
 
 def _parse_numbered_with_answer_label(text: str) -> list[dict]:
-
-    q_parts = _NUM_Q.split("\n" + text)
     results = []
-
-    for part in q_parts[1:]:
-        a_parts = _NUM_A_LABEL.split(part, maxsplit=1)
-        if len(a_parts) != 2:
-            continue
-        question = a_parts[0].strip()
-        answer   = _NUM_Q.split(a_parts[1])[0].strip()
+    for m in _NUM_BLOCK.finditer(text):
+        question = m.group(1).strip()
+        answer   = m.group(2).strip()
         if len(question) >= 5 and len(answer) >= 2:
             results.append({"question": question, "answer": answer})
-
     return results
 
 
@@ -107,38 +85,33 @@ def _parse_numbered_with_answer_label(text: str) -> list[dict]:
 _NUMBERED_LINE = re.compile(r"^\s*(\d+)[\.\)]\s+(.{5,})")
 
 def _parse_numbered_pairs(text: str) -> list[dict]:
-
     lines   = text.split("\n")
     results = []
     i       = 0
-
     while i < len(lines):
         m = _NUMBERED_LINE.match(lines[i])
         if m:
-            question     = m.group(2).strip()
+            question     = m.group(2).strip()  # full question text preserved
             answer_lines = []
             j = i + 1
             while j < len(lines):
-                stripped = lines[j].strip()
                 if _NUMBERED_LINE.match(lines[j]):
                     break
+                stripped = lines[j].strip()
                 if stripped:
                     answer_lines.append(lines[j])
                 elif answer_lines:
-                    # Allow one blank line inside an answer block
                     if j + 1 < len(lines) and lines[j + 1].strip():
                         answer_lines.append("")
                     else:
                         break
                 j += 1
-
             answer = "\n".join(answer_lines).strip()
             if question and len(answer) >= 2:
                 results.append({"question": question, "answer": answer})
             i = j
         else:
             i += 1
-
     return results
 
 
@@ -147,7 +120,6 @@ def _parse_numbered_pairs(text: str) -> list[dict]:
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _parse_paragraph_pairs(text: str) -> list[dict]:
-
     paragraphs = [
         p.strip()
         for p in re.split(r"\n{2,}", text)
@@ -173,7 +145,6 @@ def process_bulk_upload(
     raw_text: str,
     session=None,
 ) -> dict:
-
     from django.db import transaction
     from apps.core.models import Question, Answer
     from apps.core.services.duplicate_detector import (
@@ -183,7 +154,6 @@ def process_bulk_upload(
     from apps.core.services.audit_service import create_audit_log
 
     pairs = parse_bulk_text(raw_text)
-
     report: dict = {
         "total_parsed":       len(pairs),
         "questions_created":  0,
@@ -202,20 +172,18 @@ def process_bulk_upload(
 
     for pair in pairs:
         q_text = pair["question"].strip()
-        a_text = pair["answer"].strip()
+        a_text = pair["answer"]  # preserve exactly as-is (no .strip() on answer)
 
         if len(q_text) < 5:
             continue
 
         try:
-            # ── Exact duplicate within same subcategory ──────────────────────
-            norm = normalize_question(q_text)
+            norm  = normalize_question(q_text)
             exact = Question.objects.filter(
                 subcategory=subcategory,
                 normalized_title=norm,
             ).first()
 
-            # ── Fuzzy duplicate across the whole DB ──────────────────────────
             fuzzy_dupes = [] if exact else find_similar_questions(q_text, threshold=88)
 
             if exact or fuzzy_dupes:
@@ -226,7 +194,6 @@ def process_bulk_upload(
                 })
                 continue
 
-            # ── Save ─────────────────────────────────────────────────────────
             with transaction.atomic():
                 question = Question.objects.create(
                     subcategory      = subcategory,
@@ -236,10 +203,10 @@ def process_bulk_upload(
                 )
                 report["questions_created"] += 1
 
-                if a_text:
+                if a_text.strip():
                     Answer.objects.create(
                         question   = question,
-                        content    = a_text,   # ← preserved exactly
+                        content    = a_text,  # ← preserved exactly, no chars lost
                         created_by = user,
                     )
                     report["answers_created"] += 1

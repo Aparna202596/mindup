@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+    {% block title %}My Dashboard — MindUp{% endblock %}
+
+    {% block content %}
+    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div>
+        <h1 class="h3 fw-bold mb-0"><i class="bi bi-speedometer2 me-2 text-primary"></i>My Dashboard</h1>
+        <p class="text-muted small mb-0">{{ user.email }}</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'favorites' %}" class="btn btn-outline-warning btn-sm">
+        <i class="bi bi-star-fill me-1"></i>My Favorites
+        </a>
+        <a href="{% url 'bulk-qa-upload' %}" class="btn btn-success btn-sm">
+        <i class="bi bi-cloud-upload me-1"></i>Bulk Upload
+        </a>
+    </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="stat-card text-center">
+        <div class="stat-number text-primary">{{ total_questions }}</div>
+        <div class="stat-label">Questions Asked</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card text-center">
+        <div class="stat-number text-success">{{ total_answers }}</div>
+        <div class="stat-label">Answers Given</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card text-center">
+        <div class="stat-number text-warning">{{ total_favorites }}</div>
+        <div class="stat-label">Favorites</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card text-center">
+        <div class="stat-number text-danger">{{ unread_count }}</div>
+        <div class="stat-label">Unread Notifications</div>
+        </div>
+    </div>
+    </div>
+
+    <div class="row g-4">
+    <!-- Recent Questions -->
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between">
+            <span class="fw-semibold"><i class="bi bi-question-circle me-2 text-primary"></i>My Recent Questions</span>
+            <a href="{% url 'question-list' %}" class="small text-muted text-decoration-none">View all →</a>
+        </div>
+        <div class="card-body p-0">
+            {% for q in my_questions %}
+            <a href="{% url 'question-detail' q.pk %}" class="d-block text-decoration-none px-4 py-3 border-bottom text-dark hover-bg">
+            <div class="fw-medium small">{{ q.title|truncatechars:80 }}</div>
+            <div class="text-muted" style="font-size:0.75rem;">
+                {{ q.subcategory.name }} · {{ q.created_at|date:"M d" }} · <i class="bi bi-chat"></i> {{ q.answers.count }}
+            </div>
+            </a>
+            {% empty %}
+            <div class="text-center py-4 text-muted small">
+            <i class="bi bi-question-circle d-block fs-3 mb-2"></i>No questions yet.
+            <a href="{% url 'question-create' %}" class="d-block mt-1 text-primary">Ask your first question</a>
+            </div>
+            {% endfor %}
+        </div>
+        </div>
+    </div>
+
+    <!-- Recent Answers -->
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between">
+            <span class="fw-semibold"><i class="bi bi-chat-text me-2 text-success"></i>My Recent Answers</span>
+        </div>
+        <div class="card-body p-0">
+            {% for a in my_answers %}
+            <a href="{% url 'question-detail' a.question.pk %}" class="d-block text-decoration-none px-4 py-3 border-bottom text-dark hover-bg">
+            <div class="fw-medium small">{{ a.question.title|truncatechars:70 }}</div>
+            <div class="text-muted small">{{ a.content|truncatechars:60 }}</div>
+            <div class="text-muted" style="font-size:0.75rem;">{{ a.created_at|date:"M d" }}</div>
+            </a>
+            {% empty %}
+            <div class="text-center py-4 text-muted small">
+            <i class="bi bi-chat d-block fs-3 mb-2"></i>No answers yet.
+            </div>
+            {% endfor %}
+        </div>
+        </div>
+    </div>
+
+    <!-- Notifications -->
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between">
+            <span class="fw-semibold">
+            <i class="bi bi-bell me-2 text-warning"></i>Notifications
+            {% if unread_count %}
+                <span class="badge bg-danger ms-1">{{ unread_count }}</span>
+            {% endif %}
+            </span>
+            {% if unread_count %}
+            <form method="post" action="{% url 'notification-read-all' %}" class="d-inline">
+            {% csrf_token %}
+            <button class="btn btn-link btn-sm text-muted p-0">Mark all read</button>
+            </form>
+            {% endif %}
+        </div>
+        <div class="card-body p-0">
+            {% for n in notifications %}
+            <div class="d-flex gap-3 px-4 py-3 border-bottom {% if not n.is_read %}bg-primary bg-opacity-5{% endif %}">
+            <i class="bi bi-bell{% if not n.is_read %}-fill text-warning{% else %} text-muted{% endif %} flex-shrink-0 mt-1"></i>
+            <div class="flex-grow-1">
+                <div class="fw-medium small">{{ n.title }}</div>
+                <div class="text-muted small">{{ n.message }}</div>
+                <div class="text-muted" style="font-size:0.7rem;">{{ n.created_at|date:"M d, Y H:i" }}</div>
+            </div>
+            {% if not n.is_read %}
+            <a href="{% url 'notification-read' n.pk %}" class="btn btn-link btn-sm p-0 text-muted flex-shrink-0" title="Mark read">
+                <i class="bi bi-check2"></i>
+            </a>
+            {% endif %}
+            </div>
+            {% empty %}
+            <div class="text-center py-4 text-muted small">
+            <i class="bi bi-bell-slash d-block fs-3 mb-2"></i>No notifications.
+            </div>
+            {% endfor %}
+        </div>
+        </div>
+    </div>
+
+    <!-- Recent Bulk Uploads -->
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom d-flex align-items-center justify-content-between">
+            <span class="fw-semibold"><i class="bi bi-cloud-upload me-2 text-info"></i>Recent Bulk Uploads</span>
+            <a href="{% url 'bulk-qa-upload' %}" class="btn btn-success btn-sm">
+            <i class="bi bi-plus-lg me-1"></i>New Upload
+            </a>
+        </div>
+        <div class="card-body p-0">
+            {% for upload in my_bulk_uploads %}
+            <div class="px-4 py-3 border-bottom">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                <div class="fw-medium small">{{ upload.subcategory.name|default:"—" }}</div>
+                <div class="text-muted" style="font-size:0.75rem;">
+                    {{ upload.created_at|date:"M d, Y" }}
+                </div>
+                </div>
+                <div class="text-end">
+                <span class="badge badge-approved">{{ upload.questions_created }} Q</span>
+                {% if upload.duplicates_skipped %}
+                <span class="badge badge-pending ms-1">{{ upload.duplicates_skipped }} dup</span>
+                {% endif %}
+                </div>
+            </div>
+            </div>
+            {% empty %}
+            <div class="text-center py-4 text-muted small">
+            <i class="bi bi-cloud-upload d-block fs-3 mb-2"></i>No uploads yet.
+            <a href="{% url 'bulk-qa-upload' %}" class="d-block mt-1 text-primary">Start a bulk upload</a>
+            </div>
+            {% endfor %}
+        </div>
+        </div>
+    </div>
+    </div>
+{% endblock %}

@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+    {% block title %}Bulk Q&A Upload — MindUp{% endblock %}
+
+    {% block content %}
+    <div class="row g-4">
+    <div class="col-lg-8">
+        <!-- Page header -->
+        <div class="d-flex align-items-center gap-3 mb-4">
+        <div class="detail-icon-wrap bg-success bg-opacity-10 text-success">
+            <i class="bi bi-cloud-upload fs-4"></i>
+        </div>
+        <div>
+            <h1 class="h3 fw-bold mb-0">Bulk Q&amp;A Upload</h1>
+            <p class="text-muted small mb-0">Paste Q&amp;A content and import it instantly</p>
+        </div>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+        <div class="card-body p-4">
+            <form method="post" id="bulkUploadForm" novalidate>
+            {% csrf_token %}
+
+            <!-- Step 1: Select hierarchy -->
+            <div class="mb-4">
+                <h6 class="fw-semibold text-uppercase text-muted small mb-3 letter-spacing-1">
+                <span class="badge bg-primary me-2">1</span>Select Location
+                </h6>
+                <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-medium">Topic <span class="text-danger">*</span></label>
+                    {{ form.topic }}
+                    {% if form.topic.errors %}
+                    <div class="invalid-feedback d-block">{{ form.topic.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-medium">Category <span class="text-danger">*</span></label>
+                    {{ form.category }}
+                    {% if form.category.errors %}
+                    <div class="invalid-feedback d-block">{{ form.category.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-medium">Subcategory <span class="text-danger">*</span></label>
+                    {{ form.subcategory }}
+                    {% if form.subcategory.errors %}
+                    <div class="invalid-feedback d-block">{{ form.subcategory.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                </div>
+            </div>
+
+            <!-- Step 2: Paste content -->
+            <div class="mb-4">
+                <h6 class="fw-semibold text-uppercase text-muted small mb-3">
+                <span class="badge bg-primary me-2">2</span>Paste Q&amp;A Content
+                </h6>
+
+                <!-- Format guide -->
+                <div class="alert alert-info d-flex gap-2 py-2 mb-3 rounded-3">
+                <i class="bi bi-info-circle-fill text-info flex-shrink-0 mt-1"></i>
+                <div class="small">
+                    <strong>Supported formats:</strong>
+                    <code class="ms-1">Q: … A: …</code>,
+                    <code>Question 1: … Answer 1: …</code>,
+                    <code>1. Question … Answer text</code>,
+                    or blank-line separated paragraph pairs.
+                    Formatting (bullets, tables, code) is <strong>preserved exactly</strong>.
+                </div>
+                </div>
+
+                <label class="form-label fw-medium" for="id_raw_text">
+                Content <span class="text-danger">*</span>
+                </label>
+                {{ form.raw_text }}
+                <div class="d-flex justify-content-between mt-1">
+                <div class="text-muted small" id="charCount">0 characters</div>
+                <div class="text-muted small" id="pairEstimate"></div>
+                </div>
+                {% if form.raw_text.errors %}
+                <div class="invalid-feedback d-block">{{ form.raw_text.errors.0 }}</div>
+                {% endif %}
+            </div>
+
+            <!-- Action buttons -->
+            <div class="d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-outline-secondary" id="previewBtn" disabled>
+                <i class="bi bi-eye me-1"></i>Preview
+                </button>
+                <button type="submit" class="btn btn-success" id="submitBtn" disabled>
+                <i class="bi bi-cloud-upload me-1"></i>Upload Q&amp;A
+                </button>
+                <a href="{% url 'question-list' %}" class="btn btn-outline-light text-muted">Cancel</a>
+            </div>
+            </form>
+        </div>
+        </div>
+    </div>
+
+    <!-- ── Right sidebar: report + tips ────────────────────────────────────── -->
+    <div class="col-lg-4">
+        {% if report %}
+        <!-- Upload report -->
+        <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white fw-semibold border-bottom">
+            <i class="bi bi-bar-chart-line me-2 text-primary"></i>Upload Report
+        </div>
+        <div class="card-body">
+            <div class="row g-2 text-center mb-3">
+            <div class="col-4">
+                <div class="p-2 bg-success bg-opacity-10 rounded-3">
+                <div class="fw-bold text-success fs-4">{{ report.questions_created }}</div>
+                <div class="small text-muted">Created</div>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="p-2 bg-warning bg-opacity-10 rounded-3">
+                <div class="fw-bold text-warning fs-4">{{ report.duplicates_skipped|length }}</div>
+                <div class="small text-muted">Skipped</div>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="p-2 bg-danger bg-opacity-10 rounded-3">
+                <div class="fw-bold text-danger fs-4">{{ report.errors|length }}</div>
+                <div class="small text-muted">Errors</div>
+                </div>
+            </div>
+            </div>
+
+            <div class="small text-muted mb-2">
+            Total parsed: <strong>{{ report.total_parsed }}</strong> pairs &nbsp;·&nbsp;
+            Answers saved: <strong>{{ report.answers_created }}</strong>
+            </div>
+
+            {% if report.duplicates_skipped %}
+            <div class="mt-3">
+            <div class="fw-medium small mb-2 text-warning">
+                <i class="bi bi-exclamation-triangle me-1"></i>Duplicates Skipped
+            </div>
+            <div class="duplicate-list" style="max-height:200px; overflow-y:auto;">
+                {% for dup in report.duplicates_skipped %}
+                <div class="alert alert-warning py-1 px-2 mb-1 small rounded-2">
+                <strong>Skipped:</strong> "{{ dup.question|truncatechars:60 }}"
+                </div>
+                {% endfor %}
+            </div>
+            </div>
+            {% endif %}
+
+            {% if report.errors %}
+            <div class="mt-3">
+            <div class="fw-medium small mb-2 text-danger">
+                <i class="bi bi-x-circle me-1"></i>Errors
+            </div>
+            {% for err in report.errors %}
+            <div class="alert alert-danger py-1 px-2 mb-1 small rounded-2">{{ err }}</div>
+            {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        </div>
+        {% endif %}
+
+        <!-- Tips card -->
+        <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white fw-semibold border-bottom">
+            <i class="bi bi-lightbulb me-2 text-warning"></i>Format Examples
+        </div>
+        <div class="card-body p-0">
+            <div class="accordion accordion-flush" id="formatExamples">
+            <div class="accordion-item border-0">
+                <h2 class="accordion-header">
+                <button class="accordion-button collapsed py-2 small fw-medium" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#fmt1">
+                    Format 1: Q:/A: Markers
+                </button>
+                </h2>
+                <div id="fmt1" class="accordion-collapse collapse" data-bs-parent="#formatExamples">
+                <div class="accordion-body pt-0">
+                    <pre class="bg-light rounded p-2 small mb-0">Q: What is Python?
+    A: Python is a high-level
+    programming language.
+
+    Q: What is Django?
+    A: Django is a web framework
+    built with Python.</pre>
+                </div>
+                </div>
+            </div>
+            <div class="accordion-item border-0">
+                <h2 class="accordion-header">
+                <button class="accordion-button collapsed py-2 small fw-medium" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#fmt2">
+                    Format 2: Numbered Questions
+                </button>
+                </h2>
+                <div id="fmt2" class="accordion-collapse collapse" data-bs-parent="#formatExamples">
+                <div class="accordion-body pt-0">
+                    <pre class="bg-light rounded p-2 small mb-0">1. What is encapsulation?
+    Encapsulation bundles data and
+    methods into a class.
+
+    2. What is polymorphism?
+    Polymorphism allows different
+    forms of the same interface.</pre>
+                </div>
+                </div>
+            </div>
+            <div class="accordion-item border-0">
+                <h2 class="accordion-header">
+                <button class="accordion-button collapsed py-2 small fw-medium" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#fmt3">
+                    Format 3: Q1./A1. Style
+                </button>
+                </h2>
+                <div id="fmt3" class="accordion-collapse collapse" data-bs-parent="#formatExamples">
+                <div class="accordion-body pt-0">
+                    <pre class="bg-light rounded p-2 small mb-0">Q1. What is REST?
+    Answer: REST stands for
+    Representational State Transfer.
+
+    Q2. What is SOAP?
+    Answer: SOAP is a protocol
+    for web services.</pre>
+                </div>
+                </div>
+            </div>
+            </div>
+        </div>
+        </div>
+    </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div class="modal fade" id="uploadConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+        <div class="modal-header border-0">
+            <h5 class="modal-title fw-bold">
+            <i class="bi bi-cloud-upload me-2 text-success"></i>Confirm Upload
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+            <p class="mb-2">Ready to upload approximately <strong id="previewCount">?</strong> Q&amp;A pair(s) to:</p>
+            <div class="bg-light rounded-3 p-3 small">
+            <div><strong>Subcategory:</strong> <span id="previewSubcat"></span></div>
+            </div>
+            <p class="text-muted small mt-3 mb-0">
+            <i class="bi bi-shield-check me-1 text-success"></i>
+            Duplicates will be automatically detected and skipped.
+            Answers are saved exactly as pasted.
+            </p>
+        </div>
+        <div class="modal-footer border-0">
+            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-success" id="confirmUploadBtn">
+            <i class="bi bi-cloud-upload me-1"></i>Upload Now
+            </button>
+        </div>
+        </div>
+    </div>
+    </div>
+{% endblock %}

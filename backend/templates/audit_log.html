@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Audit Log — MindUp{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h1 class="h3 fw-bold mb-0"><i class="bi bi-journal-text me-2 text-primary"></i>Audit Log</h1>
+    <p class="text-muted small mb-0">All admin and user actions tracked here</p>
+  </div>
+  <a href="{% url 'admin-dashboard' %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Dashboard
+  </a>
+</div>
+
+<!-- Filters -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body py-3">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-sm-4">
+        <label class="form-label small fw-medium mb-1">Action</label>
+        <select name="action" class="form-select form-select-sm">
+          <option value="">All Actions</option>
+          {% for a in actions %}
+          <option value="{{ a }}" {% if action_filter == a %}selected{% endif %}>{{ a }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-4">
+        <label class="form-label small fw-medium mb-1">Object Type</label>
+        <select name="type" class="form-select form-select-sm">
+          <option value="">All Types</option>
+          {% for t in types %}
+          <option value="{{ t }}" {% if type_filter == t %}selected{% endif %}>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-4 d-flex gap-2">
+        <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+        <a href="{% url 'audit-log' %}" class="btn btn-outline-secondary btn-sm">Clear</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Action</th>
+            <th>Type</th>
+            <th>Object ID</th>
+            <th>User</th>
+            <th>When</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in page %}
+          <tr>
+            <td>
+              <span class="badge {% if log.action == 'CREATE' %}bg-success
+                                  {% elif log.action == 'DELETE' %}bg-danger
+                                  {% elif log.action == 'EDIT' %}bg-primary
+                                  {% elif log.action == 'HIDE' or log.action == 'UNHIDE' %}bg-warning text-dark
+                                  {% elif log.action == 'APPROVE' %}bg-success
+                                  {% elif log.action == 'REJECT' %}bg-danger
+                                  {% else %}bg-secondary{% endif %}">
+                {{ log.action }}
+              </span>
+            </td>
+            <td class="small text-muted">{{ log.object_type }}</td>
+            <td class="small text-muted font-monospace">{{ log.object_id|stringformat:"s"|truncatechars:12 }}</td>
+            <td class="small">{{ log.user.email|default:"—"|truncatechars:25 }}</td>
+            <td class="small text-muted">{{ log.created_at|date:"M d, Y H:i" }}</td>
+            <td class="small text-muted">
+              {% if log.new_data %}
+                {% for k, v in log.new_data.items %}
+                  <span class="text-truncate d-inline-block" style="max-width:120px;">{{ k }}: {{ v }}</span>
+                {% endfor %}
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-center py-5 text-muted">
+              <i class="bi bi-journal display-6 d-block mb-2"></i>No audit entries found.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Pagination -->
+{% if page.has_other_pages %}
+<nav class="mt-4">
+  <ul class="pagination pagination-sm justify-content-center">
+    {% if page.has_previous %}
+    <li class="page-item"><a class="page-link" href="?action={{ action_filter }}&type={{ type_filter }}&page={{ page.previous_page_number }}">«</a></li>
+    {% endif %}
+    <li class="page-item disabled"><span class="page-link">Page {{ page.number }} of {{ page.paginator.num_pages }}</span></li>
+    {% if page.has_next %}
+    <li class="page-item"><a class="page-link" href="?action={{ action_filter }}&type={{ type_filter }}&page={{ page.next_page_number }}">»</a></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
+{% endblock %}

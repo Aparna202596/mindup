@@ -1,0 +1,536 @@
+{% extends "base.html" %}
+    {% block title %}
+    {% if topic %}{{ topic.name }}
+    {% elif category %}{{ category.name }}
+    {% elif subcategory %}{{ subcategory.name }}
+    {% endif %} — MindUp
+    {% endblock %}
+
+    {% block content %}
+    {% with obj=topic|default:category|default:subcategory %}
+
+    <!-- ── Breadcrumb ───────────────────────────────────────────────────────── -->
+    <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb small">
+        <li class="breadcrumb-item"><a href="{% url 'topic-list' %}">Topics</a></li>
+        {% if category %}
+        <li class="breadcrumb-item"><a href="{% url 'topic-detail' category.topic.pk %}">{{ category.topic.name }}</a></li>
+        {% elif subcategory %}
+        <li class="breadcrumb-item"><a href="{% url 'topic-detail' subcategory.category.topic.pk %}">{{ subcategory.category.topic.name }}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'category-detail' subcategory.category.pk %}">{{ subcategory.category.name }}</a></li>
+        {% endif %}
+        <li class="breadcrumb-item active">
+        {% if topic %}{{ topic.name }}{% elif category %}{{ category.name }}{% else %}{{ subcategory.name }}{% endif %}
+        </li>
+    </ol>
+    </nav>
+
+    <!-- ── Page header ──────────────────────────────────────────────────────── -->
+    <div class="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-3">
+    <div class="d-flex align-items-center gap-3">
+        <div class="detail-icon-wrap
+        {% if topic %}bg-primary bg-opacity-10 text-primary
+        {% elif category %}bg-info bg-opacity-10 text-info
+        {% else %}bg-secondary bg-opacity-10 text-secondary{% endif %}">
+        <i class="bi {% if topic %}bi-journals{% elif category %}bi-folder2{% else %}bi-folder-symlink{% endif %}"></i>
+        </div>
+        <div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <h1 class="h3 fw-bold mb-0">
+            {% if topic %}{{ topic.name }}{% elif category %}{{ category.name }}{% else %}{{ subcategory.name }}{% endif %}
+            </h1>
+            {% if topic %}
+            <span class="badge badge-{{ topic.status }}">{{ topic.status|title }}</span>
+            {% if topic.is_hidden %}<span class="badge bg-secondary"><i class="bi bi-eye-slash me-1"></i>Hidden</span>{% endif %}
+            {% elif category %}
+            <span class="badge badge-{{ category.status }}">{{ category.status|title }}</span>
+            {% if category.is_hidden %}<span class="badge bg-secondary"><i class="bi bi-eye-slash me-1"></i>Hidden</span>{% endif %}
+            {% else %}
+            <span class="badge badge-{{ subcategory.status }}">{{ subcategory.status|title }}</span>
+            {% if subcategory.is_hidden %}<span class="badge bg-secondary"><i class="bi bi-eye-slash me-1"></i>Hidden</span>{% endif %}
+            {% endif %}
+        </div>
+        {% if topic and topic.description %}
+            <p class="text-muted mb-0 mt-1">{{ topic.description }}</p>
+        {% elif category and category.description %}
+            <p class="text-muted mb-0 mt-1">{{ category.description }}</p>
+        {% endif %}
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 flex-wrap">
+        <!-- Favorite button -->
+        {% if user.is_authenticated %}
+        <button class="btn btn-sm {% if topic %}{% if topic.pk|stringformat:'s' in fav_topic_ids|join:',' %}btn-warning{% else %}btn-outline-warning{% endif %}
+                                {% elif category %}{% if category.pk|stringformat:'s' in fav_cat_ids|join:',' %}btn-warning{% else %}btn-outline-warning{% endif %}
+                                {% else %}{% if subcategory.pk|stringformat:'s' in fav_subcat_ids|join:',' %}btn-warning{% else %}btn-outline-warning{% endif %}{% endif %}
+                    fav-btn"
+                data-content-type="{% if topic %}topic{% elif category %}category{% else %}subcategory{% endif %}"
+                data-object-id="{% if topic %}{{ topic.pk }}{% elif category %}{{ category.pk }}{% else %}{{ subcategory.pk }}{% endif %}"
+                title="Toggle Favorite">
+        <i class="bi bi-star{% if topic %}{% if topic.pk|stringformat:'s' in fav_topic_ids|join:',' %}-fill{% endif %}{% elif category %}{% if category.pk|stringformat:'s' in fav_cat_ids|join:',' %}-fill{% endif %}{% else %}{% if subcategory.pk|stringformat:'s' in fav_subcat_ids|join:',' %}-fill{% endif %}{% endif %}"></i>
+        <span class="ms-1 d-none d-sm-inline">Favorite</span>
+        </button>
+        {% endif %}
+
+        {% if is_admin %}
+        <!-- Admin controls -->
+        {% if topic %}
+        <button class="btn btn-sm btn-outline-primary"
+                data-crud-action="edit" data-crud-type="topic" data-crud-id="{{ topic.pk }}">
+            <i class="bi bi-pencil me-1"></i>Edit
+        </button>
+        {% if topic.is_hidden %}
+        <button class="btn btn-sm btn-outline-success ajax-unhide"
+                data-type="topic" data-id="{{ topic.pk }}" data-name="{{ topic.name }}">
+            <i class="bi bi-eye me-1"></i>Unhide
+        </button>
+        {% else %}
+        <button class="btn btn-sm btn-outline-warning ajax-hide"
+                data-type="topic" data-id="{{ topic.pk }}" data-name="{{ topic.name }}">
+            <i class="bi bi-eye-slash me-1"></i>Hide
+        </button>
+        {% endif %}
+        <button class="btn btn-sm btn-outline-danger ajax-delete"
+                data-type="topic" data-id="{{ topic.pk }}" data-name="{{ topic.name }}">
+            <i class="bi bi-trash me-1"></i>Delete
+        </button>
+        {% elif category %}
+        <button class="btn btn-sm btn-outline-primary"
+                data-crud-action="edit" data-crud-type="category" data-crud-id="{{ category.pk }}">
+            <i class="bi bi-pencil me-1"></i>Edit
+        </button>
+        {% if category.is_hidden %}
+        <button class="btn btn-sm btn-outline-success ajax-unhide"
+                data-type="category" data-id="{{ category.pk }}" data-name="{{ category.name }}">
+            <i class="bi bi-eye me-1"></i>Unhide
+        </button>
+        {% else %}
+        <button class="btn btn-sm btn-outline-warning ajax-hide"
+                data-type="category" data-id="{{ category.pk }}" data-name="{{ category.name }}">
+            <i class="bi bi-eye-slash me-1"></i>Hide
+        </button>
+        {% endif %}
+        <button class="btn btn-sm btn-outline-danger ajax-delete"
+                data-type="category" data-id="{{ category.pk }}" data-name="{{ category.name }}">
+            <i class="bi bi-trash me-1"></i>Delete
+        </button>
+        {% else %}
+        <button class="btn btn-sm btn-outline-primary"
+                data-crud-action="edit" data-crud-type="subcategory" data-crud-id="{{ subcategory.pk }}">
+            <i class="bi bi-pencil me-1"></i>Edit
+        </button>
+        {% if subcategory.is_hidden %}
+        <button class="btn btn-sm btn-outline-success ajax-unhide"
+                data-type="subcategory" data-id="{{ subcategory.pk }}" data-name="{{ subcategory.name }}">
+            <i class="bi bi-eye me-1"></i>Unhide
+        </button>
+        {% else %}
+        <button class="btn btn-sm btn-outline-warning ajax-hide"
+                data-type="subcategory" data-id="{{ subcategory.pk }}" data-name="{{ subcategory.name }}">
+            <i class="bi bi-eye-slash me-1"></i>Hide
+        </button>
+        {% endif %}
+        <button class="btn btn-sm btn-outline-danger ajax-delete"
+                data-type="subcategory" data-id="{{ subcategory.pk }}" data-name="{{ subcategory.name }}">
+            <i class="bi bi-trash me-1"></i>Delete
+        </button>
+        {% endif %}
+        {% endif %}
+    </div>
+    </div>
+
+    <!-- ── Topic view: categories + subcategories + Q&A ─────────────────────── -->
+    {% if topic %}
+    {% if categories %}
+        {% for cat in categories %}
+        <div class="card border-0 shadow-sm mb-4" id="cat-{{ cat.pk }}">
+        <div class="card-header bg-white d-flex align-items-center justify-content-between py-3 border-bottom">
+            <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-folder2-open text-info fs-5"></i>
+            <a href="{% url 'category-detail' cat.pk %}" class="fw-semibold text-decoration-none text-dark">
+                {{ cat.name }}
+            </a>
+            {% if cat.is_hidden %}<span class="badge bg-secondary small"><i class="bi bi-eye-slash"></i></span>{% endif %}
+            {% if user.is_authenticated %}
+            <button class="btn btn-link btn-sm p-0 fav-btn"
+                    data-content-type="category" data-object-id="{{ cat.pk }}"
+                    title="Favorite category">
+                <i class="bi bi-star{% if cat.pk in fav_cat_ids %}-fill text-warning{% else %} text-muted{% endif %}"></i>
+            </button>
+            {% endif %}
+            </div>
+            {% if is_admin %}
+            <div class="d-flex gap-1">
+            <button class="btn btn-outline-primary btn-sm" data-crud-action="edit" data-crud-type="category" data-crud-id="{{ cat.pk }}"><i class="bi bi-pencil"></i></button>
+            {% if cat.is_hidden %}
+            <button class="btn btn-outline-success btn-sm ajax-unhide" data-type="category" data-id="{{ cat.pk }}" data-name="{{ cat.name }}"><i class="bi bi-eye"></i></button>
+            {% else %}
+            <button class="btn btn-outline-warning btn-sm ajax-hide" data-type="category" data-id="{{ cat.pk }}" data-name="{{ cat.name }}"><i class="bi bi-eye-slash"></i></button>
+            {% endif %}
+            <button class="btn btn-outline-danger btn-sm ajax-delete" data-type="category" data-id="{{ cat.pk }}" data-name="{{ cat.name }}"><i class="bi bi-trash"></i></button>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="card-body p-0">
+            {% for sub in cat.subcategories.all %}
+            {% if is_admin or not sub.is_hidden %}
+            <div class="subcategory-section border-bottom py-3 px-4" id="sub-{{ sub.pk }}">
+                <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-folder-symlink text-secondary"></i>
+                    <a href="{% url 'subcategory-detail' sub.pk %}" class="fw-medium text-decoration-none">
+                    {{ sub.name }}
+                    </a>
+                    {% if sub.is_hidden %}<span class="badge bg-secondary small"><i class="bi bi-eye-slash"></i></span>{% endif %}
+                    {% if user.is_authenticated %}
+                    <button class="btn btn-link btn-sm p-0 fav-btn"
+                            data-content-type="subcategory" data-object-id="{{ sub.pk }}"
+                            title="Favorite subcategory">
+                    <i class="bi bi-star{% if sub.pk in fav_subcat_ids %}-fill text-warning{% else %} text-muted{% endif %}"></i>
+                    </button>
+                    {% endif %}
+                </div>
+                {% if is_admin %}
+                <div class="d-flex gap-1">
+                    <button class="btn btn-outline-primary btn-sm" data-crud-action="edit" data-crud-type="subcategory" data-crud-id="{{ sub.pk }}"><i class="bi bi-pencil"></i></button>
+                    {% if sub.is_hidden %}
+                    <button class="btn btn-outline-success btn-sm ajax-unhide" data-type="subcategory" data-id="{{ sub.pk }}" data-name="{{ sub.name }}"><i class="bi bi-eye"></i></button>
+                    {% else %}
+                    <button class="btn btn-outline-warning btn-sm ajax-hide" data-type="subcategory" data-id="{{ sub.pk }}" data-name="{{ sub.name }}"><i class="bi bi-eye-slash"></i></button>
+                    {% endif %}
+                    <button class="btn btn-outline-danger btn-sm ajax-delete" data-type="subcategory" data-id="{{ sub.pk }}" data-name="{{ sub.name }}"><i class="bi bi-trash"></i></button>
+                </div>
+                {% endif %}
+                </div>
+
+                <!-- Questions under subcategory -->
+                <div class="ms-4">
+                {% for q in sub.questions.all %}
+                    {% if is_admin or not q.is_hidden %}
+                    <div class="question-item d-flex align-items-start justify-content-between gap-2 py-2 border-bottom border-light" id="q-{{ q.pk }}">
+                    <div class="flex-grow-1">
+                        <a href="{% url 'question-detail' q.pk %}" class="text-decoration-none text-dark d-block">
+                        {{ q.title|truncatechars:120 }}
+                        </a>
+                        <div class="d-flex gap-3 mt-1 small text-muted">
+                        <span><i class="bi bi-chat me-1"></i>{{ q.answers.count }}</span>
+                        <span><i class="bi bi-eye me-1"></i>{{ q.view_count }}</span>
+                        {% if q.is_hidden %}<span class="text-secondary"><i class="bi bi-eye-slash me-1"></i>Hidden</span>{% endif %}
+                        </div>
+                    </div>
+                    <div class="d-flex gap-1 flex-shrink-0">
+                        {% if user.is_authenticated %}
+                        <button class="btn btn-link btn-sm p-1 fav-btn"
+                                data-content-type="question" data-object-id="{{ q.pk }}"
+                                title="Favorite">
+                        <i class="bi bi-star{% if q.pk in fav_q_ids %}-fill text-warning{% else %} text-muted{% endif %}"></i>
+                        </button>
+                        {% endif %}
+                        {% if is_admin %}
+                        {% if q.is_hidden %}
+                        <button class="btn btn-outline-success btn-sm ajax-unhide" data-type="question" data-id="{{ q.pk }}" data-name="{{ q.title|truncatechars:40 }}"><i class="bi bi-eye"></i></button>
+                        {% else %}
+                        <button class="btn btn-outline-warning btn-sm ajax-hide" data-type="question" data-id="{{ q.pk }}" data-name="{{ q.title|truncatechars:40 }}"><i class="bi bi-eye-slash"></i></button>
+                        {% endif %}
+                        <button class="btn btn-outline-danger btn-sm ajax-delete" data-type="question" data-id="{{ q.pk }}" data-name="{{ q.title|truncatechars:40 }}"><i class="bi bi-trash"></i></button>
+                        {% endif %}
+                    </div>
+                    </div>
+                    {% endif %}
+                {% empty %}
+                    <p class="text-muted small py-2 mb-0">No questions yet.</p>
+                {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            {% empty %}
+            <p class="text-muted p-4 mb-0">No subcategories yet.</p>
+            {% endfor %}
+        </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="text-center py-5 text-muted">
+        <i class="bi bi-folder2 display-5 d-block mb-3"></i>
+        <p>No categories found{% if not is_admin %} with content{% endif %}.</p>
+        {% if is_admin %}
+        <button class="btn btn-primary" data-crud-action="create" data-crud-type="category">
+            <i class="bi bi-plus-lg me-1"></i>Add Category
+        </button>
+        {% endif %}
+        </div>
+    {% endif %}
+
+    <!-- ── Category view: subcategories + Q&A ───────────────────────────────── -->
+    {% elif category %}
+    {% if subcategories %}
+        {% for sub in subcategories %}
+        <div class="card border-0 shadow-sm mb-4" id="sub-{{ sub.pk }}">
+        <div class="card-header bg-white d-flex align-items-center justify-content-between py-3">
+            <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-folder-symlink text-secondary fs-5"></i>
+            <a href="{% url 'subcategory-detail' sub.pk %}" class="fw-semibold text-decoration-none text-dark">
+                {{ sub.name }}
+            </a>
+            {% if sub.is_hidden %}<span class="badge bg-secondary small"><i class="bi bi-eye-slash"></i></span>{% endif %}
+            {% if user.is_authenticated %}
+            <button class="btn btn-link btn-sm p-0 fav-btn"
+                    data-content-type="subcategory" data-object-id="{{ sub.pk }}">
+                <i class="bi bi-star{% if sub.pk in fav_subcat_ids %}-fill text-warning{% else %} text-muted{% endif %}"></i>
+            </button>
+            {% endif %}
+            </div>
+            {% if is_admin %}
+            <div class="d-flex gap-1">
+            <button class="btn btn-outline-primary btn-sm" data-crud-action="edit" data-crud-type="subcategory" data-crud-id="{{ sub.pk }}"><i class="bi bi-pencil"></i></button>
+            {% if sub.is_hidden %}
+            <button class="btn btn-outline-success btn-sm ajax-unhide" data-type="subcategory" data-id="{{ sub.pk }}" data-name="{{ sub.name }}"><i class="bi bi-eye"></i></button>
+            {% else %}
+            <button class="btn btn-outline-warning btn-sm ajax-hide" data-type="subcategory" data-id="{{ sub.pk }}" data-name="{{ sub.name }}"><i class="bi bi-eye-slash"></i></button>
+            {% endif %}
+            <button class="btn btn-outline-danger btn-sm ajax-delete" data-type="subcategory" data-id="{{ sub.pk }}" data-name="{{ sub.name }}"><i class="bi bi-trash"></i></button>
+            </div>
+            {% endif %}
+        </div>
+        <div class="card-body px-4 py-3">
+            {% for q in sub.questions.all %}
+            {% if is_admin or not q.is_hidden %}
+            <div class="question-item d-flex align-items-start justify-content-between gap-2 py-2 border-bottom border-light" id="q-{{ q.pk }}">
+                <div class="flex-grow-1">
+                <a href="{% url 'question-detail' q.pk %}" class="text-decoration-none text-dark">
+                    {{ q.title|truncatechars:120 }}
+                </a>
+                <div class="d-flex gap-3 mt-1 small text-muted">
+                    <span><i class="bi bi-chat me-1"></i>{{ q.answers.count }}</span>
+                    <span><i class="bi bi-eye me-1"></i>{{ q.view_count }}</span>
+                    {% if q.is_hidden %}<span class="text-secondary"><i class="bi bi-eye-slash me-1"></i>Hidden</span>{% endif %}
+                </div>
+                </div>
+                <div class="d-flex gap-1 flex-shrink-0">
+                {% if user.is_authenticated %}
+                <button class="btn btn-link btn-sm p-1 fav-btn"
+                        data-content-type="question" data-object-id="{{ q.pk }}">
+                    <i class="bi bi-star{% if q.pk in fav_q_ids %}-fill text-warning{% else %} text-muted{% endif %}"></i>
+                </button>
+                {% endif %}
+                {% if is_admin %}
+                {% if q.is_hidden %}
+                <button class="btn btn-outline-success btn-sm ajax-unhide" data-type="question" data-id="{{ q.pk }}" data-name="{{ q.title|truncatechars:40 }}"><i class="bi bi-eye"></i></button>
+                {% else %}
+                <button class="btn btn-outline-warning btn-sm ajax-hide" data-type="question" data-id="{{ q.pk }}" data-name="{{ q.title|truncatechars:40 }}"><i class="bi bi-eye-slash"></i></button>
+                {% endif %}
+                <button class="btn btn-outline-danger btn-sm ajax-delete" data-type="question" data-id="{{ q.pk }}" data-name="{{ q.title|truncatechars:40 }}"><i class="bi bi-trash"></i></button>
+                {% endif %}
+                </div>
+            </div>
+            {% endif %}
+            {% empty %}
+            <p class="text-muted small mb-0">No questions yet in this subcategory.</p>
+            {% endfor %}
+        </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="text-center py-5 text-muted">
+        <i class="bi bi-folder-symlink display-5 d-block mb-3"></i>
+        <p>No subcategories found.</p>
+        </div>
+    {% endif %}
+
+    <!-- ── Subcategory view: questions list ─────────────────────────────────── -->
+    {% elif subcategory %}
+    <div class="mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <span class="text-muted small">
+        <i class="bi bi-question-circle me-1"></i>
+        {{ page_obj.paginator.count }} question{{ page_obj.paginator.count|pluralize }}
+        </span>
+        {% if user.is_authenticated %}
+        <a href="{% url 'question-create' %}" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-lg me-1"></i>Ask a Question
+        </a>
+        {% endif %}
+    </div>
+
+    {% if questions %}
+        <div class="d-flex flex-column gap-2">
+        {% for q in questions %}
+            {% if is_admin or not q.is_hidden %}
+            <div class="question-card" id="q-{{ q.pk }}">
+            <div class="d-flex align-items-start justify-content-between gap-2">
+                <div class="flex-grow-1">
+                <a href="{% url 'question-detail' q.pk %}" class="fw-semibold text-decoration-none text-dark d-block mb-1">
+                    {{ q.title|truncatechars:140 }}
+                </a>
+                <div class="d-flex gap-3 small text-muted flex-wrap">
+                    <span><i class="bi bi-chat me-1"></i>{{ q.answers.count }} answer{{ q.answers.count|pluralize }}</span>
+                    <span><i class="bi bi-eye me-1"></i>{{ q.view_count }} view{{ q.view_count|pluralize }}</span>
+                    <span><i class="bi bi-clock me-1"></i>{{ q.created_at|date:"M d, Y" }}</span>
+                    {% if q.is_hidden %}<span class="text-secondary"><i class="bi bi-eye-slash me-1"></i>Hidden</span>{% endif %}
+                </div>
+                </div>
+                <div class="d-flex gap-1 flex-shrink-0">
+                {% if user.is_authenticated %}
+                <button class="btn btn-sm btn-link p-1 fav-btn"
+                        data-content-type="question" data-object-id="{{ q.pk }}">
+                    <i class="bi bi-star{% if q.pk in fav_q_ids %}-fill text-warning{% else %} text-muted{% endif %}"></i>
+                </button>
+                {% endif %}
+                {% if is_admin %}
+                {% if q.is_hidden %}
+                <button class="btn btn-outline-success btn-sm ajax-unhide" data-type="question" data-id="{{ q.pk }}" data-name="{{ q.title|truncatechars:40 }}"><i class="bi bi-eye"></i></button>
+                {% else %}
+                <button class="btn btn-outline-warning btn-sm ajax-hide" data-type="question" data-id="{{ q.pk }}" data-name="{{ q.title|truncatechars:40 }}"><i class="bi bi-eye-slash"></i></button>
+                {% endif %}
+                <button class="btn btn-outline-danger btn-sm ajax-delete" data-type="question" data-id="{{ q.pk }}" data-name="{{ q.title|truncatechars:40 }}"><i class="bi bi-trash"></i></button>
+                {% endif %}
+                </div>
+            </div>
+            </div>
+            {% endif %}
+        {% endfor %}
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+        <nav class="mt-4">
+        <ul class="pagination pagination-sm justify-content-center">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.previous_page_number }}">«</a>
+            </li>
+            {% endif %}
+            {% for num in page_obj.paginator.page_range %}
+            <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+            <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+            </li>
+            {% endfor %}
+            {% if page_obj.has_next %}
+            <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}">»</a>
+            </li>
+            {% endif %}
+        </ul>
+        </nav>
+        {% endif %}
+    {% else %}
+        <div class="text-center py-5 text-muted">
+        <i class="bi bi-inbox display-5 d-block mb-3"></i>
+        <p>No questions in this subcategory yet.</p>
+        {% if user.is_authenticated %}
+        <a href="{% url 'question-create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Ask the first question
+        </a>
+        {% endif %}
+        </div>
+    {% endif %}
+    {% endif %}
+
+    {% endwith %}
+    {% endblock %}
+
+    {% block extra_js %}
+    <script>
+    // Favorite toggle
+    document.querySelectorAll('.fav-btn').forEach(btn => {
+    btn.addEventListener('click', async function(e) {
+        e.preventDefault();
+        const ct  = this.dataset.contentType;
+        const oid = this.dataset.objectId;
+        const icon = this.querySelector('i');
+
+        const resp = await fetch('/ajax/favorites/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: JSON.stringify({content_type: ct, object_id: oid}),
+        });
+        const data = await resp.json();
+        if (data.success) {
+        if (data.favorited) {
+            icon.className = icon.className.replace('bi-star ', 'bi-star-fill ') + ' text-warning';
+            this.classList.remove('btn-outline-warning');
+            this.classList.add('btn-warning');
+        } else {
+            icon.className = icon.className.replace('bi-star-fill', 'bi-star').replace(' text-warning', ' text-muted');
+            this.classList.remove('btn-warning');
+            this.classList.add('btn-outline-warning');
+        }
+        showToast(data.message, data.favorited ? 'success' : 'info');
+        }
+    });
+    });
+
+    // Hide/Unhide/Delete — shared across all detail pages
+    document.querySelectorAll('.ajax-hide').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        const {type, id, name} = this.dataset;
+        const result = await Swal.fire({
+        title: `Hide "${name}"?`,
+        text: 'All child items will also be hidden from users.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#f59e0b',
+        confirmButtonText: 'Hide',
+        });
+        if (!result.isConfirmed) return;
+        const resp = await fetch(`/ajax/${type}s/${id}/hide/`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken')},
+        });
+        const data = await resp.json();
+        if (data.success) { showToast(data.message, 'warning'); setTimeout(() => location.reload(), 700); }
+        else showToast(data.error, 'danger');
+    });
+    });
+
+    document.querySelectorAll('.ajax-unhide').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        const {type, id} = this.dataset;
+        const resp = await fetch(`/ajax/${type}s/${id}/unhide/`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken')},
+        });
+        const data = await resp.json();
+        if (data.success) { showToast(data.message, 'success'); setTimeout(() => location.reload(), 700); }
+        else Swal.fire('Cannot Unhide', data.error, 'error');
+    });
+    });
+
+    document.querySelectorAll('.ajax-delete').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        const {type, id, name} = this.dataset;
+        const result = await Swal.fire({
+        title: `Delete "${name}"?`,
+        html: `<span class="text-danger">Permanent — all children will be deleted too.</span>`,
+        icon: 'error',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'Delete permanently',
+        });
+        if (!result.isConfirmed) return;
+        const resp = await fetch(`/ajax/${type}s/${id}/delete/`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken')},
+        });
+        const data = await resp.json();
+        if (data.success) {
+        showToast(data.message, 'success');
+        const el = document.getElementById(`${type[0]}-${id}`) ||
+                    document.getElementById(`row-${id}`);
+        if (el) el.remove(); else setTimeout(() => location.reload(), 700);
+        } else showToast(data.error || 'Delete failed', 'danger');
+    });
+    });
+
+    // CRUD modal edit buttons
+    document.querySelectorAll('[data-crud-action]').forEach(btn => {
+    btn.addEventListener('click', () =>
+        openCrudModal(btn.dataset.crudAction, btn.dataset.crudType, btn.dataset.crudId));
+    });
+    </script>
+{% endblock %}

@@ -21,9 +21,9 @@
 
   <!-- ── Navbar ─────────────────────────────────────────────────────────── -->
   {% if user.is_authenticated and user.is_admin %}
-    {% include "includes/admin_navbar.html" %}
+    {% include "admin_navbar.html" %}
   {% else %}
-    {% include "includes/navbar.html" %}
+    {% include "navbar.html" %}
   {% endif %}
 
   <!-- ── Main content ───────────────────────────────────────────────────── -->
@@ -47,10 +47,10 @@
   </main>
 
   <!-- ── Footer ─────────────────────────────────────────────────────────── -->
-  {% include "includes/footer.html" %}
+  {% include "footer.html" %}
 
   <!-- ── Reusable Confirmation Modal ────────────────────────────────────── -->
-  {% include "includes/confirm_modal.html" %}
+  {% include "confirm_modal.html" %}
 
   <!-- Bootstrap 5 JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
