@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+
+{% block title %}Create Subcategory — MindUp{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb small">
+        {% if preselected_category %}
+        <li class="breadcrumb-item"><a href="{% url 'topic-list' %}">Topics</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'topic-detail' preselected_category.topic.pk %}">{{ preselected_category.topic.name }}</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'category-detail' preselected_category.pk %}">{{ preselected_category.name }}</a></li>
+        {% else %}
+        <li class="breadcrumb-item"><a href="{% url 'category-list' %}">Categories</a></li>
+        {% endif %}
+        <li class="breadcrumb-item active">New Subcategory</li>
+    </ol>
+    </nav>
+
+    <div class="card border-0 shadow-sm" style="max-width: 640px;">
+    <div class="card-body p-4">
+        <div class="d-flex align-items-center gap-2 mb-3">
+        <div class="detail-icon-wrap bg-secondary bg-opacity-10 text-secondary">
+            <i class="bi bi-folder-symlink"></i>
+        </div>
+        <h1 class="h4 fw-bold mb-0">Create Subcategory</h1>
+        </div>
+
+        {% if preselected_category %}
+        <p class="text-muted small">
+        Adding a subcategory under <strong>{{ preselected_category.name }}</strong>.
+        </p>
+        {% else %}
+        <p class="text-muted small">
+        New subcategories are submitted for admin approval before they become visible to other users.
+        </p>
+        {% endif %}
+
+        <form method="post" novalidate>
+        {% csrf_token %}
+        {{ form|crispy }}
+        <div class="d-flex gap-2 mt-3">
+            <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg me-1"></i>Submit Subcategory
+            </button>
+            {% if preselected_category %}
+            <a href="{% url 'category-detail' preselected_category.pk %}" class="btn btn-outline-secondary">Cancel</a>
+            {% else %}
+            <a href="{% url 'category-list' %}" class="btn btn-outline-secondary">Cancel</a>
+            {% endif %}
+        </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

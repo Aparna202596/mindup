@@ -52,7 +52,7 @@ def admin_dashboard(request):
 
     items = tab_querysets.get(tab, lambda: [])()
 
-    return render(request, "dashboard/admin_dashboard.html", {
+    return render(request, "admin_dashboard.html", {
         "stats":    stats,
         "pending":  pending,
         "tab":      tab,

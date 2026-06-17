@@ -12,7 +12,7 @@ from apps.core.models import Topic as _Topic
 class _TopicCreateView(UserLoginRequiredMixin, CreateView):
     model         = _Topic
     form_class    = TopicForm
-    template_name = "topics/topic_create.html"
+    template_name = "topic_create.html"
     success_url   = reverse_lazy("topic-list")
 
     def form_valid(self, form):

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Users — MindUp{% endblock %}
+
+{% block content %}
+<h1 class="h3 fw-bold mb-4"><i class="bi bi-people me-2"></i>Manage Users</h1>
+
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Email</th>
+          <th>Role</th>
+          <th>Staff</th>
+          <th>Superuser</th>
+          <th>Joined</th>
+          <th class="text-end">Update Role</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr id="row-{{ u.pk }}">
+          <td>{{ u.email }}</td>
+          <td>
+            {% if u.role %}
+            <span class="badge bg-primary-subtle text-primary">{{ u.role.name }}</span>
+            {% else %}
+            <span class="text-muted small">— none —</span>
+            {% endif %}
+          </td>
+          <td>{% if u.is_staff %}<i class="bi bi-check-circle text-success"></i>{% else %}<i class="bi bi-dash text-muted"></i>{% endif %}</td>
+          <td>{% if u.is_superuser %}<i class="bi bi-check-circle text-success"></i>{% else %}<i class="bi bi-dash text-muted"></i>{% endif %}</td>
+          <td class="small text-muted">{{ u.date_joined|date:"M d, Y" }}</td>
+          <td class="text-end">
+            <form method="post" action="{% url 'user-role-update' u.pk %}" class="d-flex gap-2 justify-content-end">
+              {% csrf_token %}
+              <select name="role_id" class="form-select form-select-sm" style="width: auto;">
+                <option value="">— No Role —</option>
+                {% for role in roles %}
+                <option value="{{ role.pk }}" {% if u.role_id == role.pk %}selected{% endif %}>{{ role.name }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="btn btn-sm btn-outline-primary">Save</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center text-muted py-4">No users found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

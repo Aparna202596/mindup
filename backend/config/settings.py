@@ -144,7 +144,7 @@ SOCIALACCOUNT_LOGIN_ON_GET = True
 
 # Override admin login template
 LOGIN_REDIRECT_URL = "smart-login-redirect"  
-LOGOUT_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/accounts/login/"
 # ==============================================================================
 # 9. INTERNATIONALIZATION & LOCALIZATION
 # ==============================================================================

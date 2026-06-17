@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ title }} — MindUp{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb small">
+    <li class="breadcrumb-item active">{{ title }}</li>
+  </ol>
+</nav>
+
+<div class="card border-0 shadow-sm" style="max-width: 680px;">
+  <div class="card-body p-4">
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <div class="detail-icon-wrap bg-primary bg-opacity-10 text-primary">
+        <i class="bi bi-pencil-square"></i>
+      </div>
+      <h1 class="h4 fw-bold mb-0">{{ title }}</h1>
+    </div>
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {{ form|crispy }}
+      <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-check-lg me-1"></i>Save Changes
+        </button>
+        {% if cancel_href %}
+        <a href="{{ cancel_href }}" class="btn btn-outline-secondary">Cancel</a>
+        {% elif cancel_url %}
+        <a href="{% url cancel_url %}" class="btn btn-outline-secondary">Cancel</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
