@@ -359,7 +359,7 @@ def topic_delete(request, pk):
         topic.delete()
         messages.success(request, "Topic deleted.")
         return redirect("admin-dashboard")
-    return render(request, "confirm_delete.html", {
+    return render(request, "unified_modal.html", {
         "object": topic, "type": "Topic", "cancel_url": "admin-dashboard",
     })
 
@@ -520,7 +520,7 @@ def category_delete(request, pk):
         cat.delete()
         messages.success(request, "Category deleted.")
         return redirect("admin-dashboard")
-    return render(request, "confirm_delete.html", {
+    return render(request, "unified_modal.html", {
         "object": cat, "type": "Category", "cancel_url": "admin-dashboard",
     })
 
@@ -643,8 +643,8 @@ def subcategory_create(request, category_pk=None):
         if category:
             return redirect("category-detail", pk=category.pk)
         return redirect("category-list")
-    return render(request, "subcategory_create.html", {
-        "form": form, "preselected_category": category,
+    return render(request, "unified_create.html", {
+        "form": form, 'form_type': 'subcategory',"preselected_category": category,
     })
 
 
@@ -658,8 +658,8 @@ def subcategory_edit(request, pk):
         obj.updated_by = request.user
         obj.save()
         create_audit_log(user=request.user, action="EDIT", object_type="SubCategory",
-                         object_id=sub.id, old_data=old,
-                         new_data={"name": obj.name, "status": obj.status})
+                        object_id=sub.id, old_data=old,
+                        new_data={"name": obj.name, "status": obj.status})
         messages.success(request, "Subcategory updated.")
         return redirect("admin-dashboard")
     return render(request, "edit_form.html", {
@@ -676,7 +676,7 @@ def subcategory_delete(request, pk):
         sub.delete()
         messages.success(request, "Subcategory deleted.")
         return redirect("admin-dashboard")
-    return render(request, "confirm_delete.html", {
+    return render(request, "unified_modal.html", {
         "object": sub, "type": "Subcategory", "cancel_url": "admin-dashboard",
     })
 
@@ -751,7 +751,7 @@ def question_detail_view(request, pk):
     answers = question.answers.prefetch_related("points").select_related("created_by")
     fav_q_ids = _user_favorite_ids(request.user, "question")
 
-    return render(request, "question_detail.html", {
+    return render(request, "unified_detail.html", {
         "question":    question,
         "answers":     answers,
         "answer_form": AnswerForm(),
@@ -856,8 +856,8 @@ def question_create_view(request):
         else:
             duplicates = result["duplicates"]
             messages.warning(request, "Similar questions already exist.")
-    return render(request, "question_create.html", {
-        "form": form, "duplicates": duplicates,
+    return render(request, "unified_create.html", {
+        "form": form,'form_type':  'question',"duplicates": duplicates,
     })
 
 
@@ -935,7 +935,7 @@ def question_delete(request, pk):
         question.delete()
         messages.success(request, "Question deleted.")
         return redirect("question-list")
-    return render(request, "confirm_delete.html", {
+    return render(request, "unified_modal.html", {
         "object": question, "type": "Question",
         "cancel_href": f"/questions/{question.pk}/",
     })
@@ -953,8 +953,8 @@ def answer_create_view(request, question_pk):
         content = form.cleaned_data["content"]
         if is_duplicate_answer(content, question_pk):
             messages.warning(request, "A very similar answer already exists.")
-            return render(request, "answer_create.html", {
-                "form": form, "question": question,
+            return render(request, "unified_create.html", {
+                "form": form, 'form_type': 'answer', "question": question,
             })
         answer            = form.save(commit=False)
         answer.question   = question
@@ -964,8 +964,8 @@ def answer_create_view(request, question_pk):
                          object_id=answer.id, new_data={"question": str(question.id)})
         messages.success(request, "Answer posted.")
         return redirect("question-detail", pk=question.pk)
-    return render(request, "answer_create.html", {
-        "form": form, "question": question,
+    return render(request, "unified_create.html", {
+        "form": form, 'form_type': 'answer',"question": question,
     })
 
 
@@ -999,7 +999,7 @@ def answer_delete(request, pk):
         answer.delete()
         messages.success(request, "Answer deleted.")
         return redirect("question-detail", pk=question_pk)
-    return render(request, "confirm_delete.html", {
+    return render(request, "unified_modal.html", {
         "object": answer, "type": "Answer",
         "cancel_href": f"/questions/{question_pk}/",
     })
@@ -1016,8 +1016,8 @@ def answer_point_create_view(request, answer_pk):
         point.save()
         messages.success(request, "Key point added.")
         return redirect("question-detail", pk=answer.question.pk)
-    return render(request, "answerpoint_create.html", {
-        "form": form, "answer": answer,
+    return render(request, "unified_create.html", {
+        "form": form,'form_type': 'answerpoint', "answer": answer,
     })
 
 

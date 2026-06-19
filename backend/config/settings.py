@@ -274,8 +274,8 @@ LOGGING = {
 # ==============================================================================
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
-CSRF_COOKIE_HTTPONLY    = True
+CSRF_COOKIE_HTTPONLY    = False
 
 SECURE_BROWSER_XSS_FILTER   = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
-X_FRAME_OPTIONS              = 'DENY'
+X_FRAME_OPTIONS             = 'DENY'

@@ -1,8 +1,11 @@
 /* ══════════════════════════════════════════════════════════════════════════
    main.js — MindUp  (Bootstrap 5 + SweetAlert2)
+   Centralized JS: no duplicate handlers across templates.
    ══════════════════════════════════════════════════════════════════════════ */
 
-// ── CSRF helper ────────────────────────────────────────────────────────────────
+'use strict';
+
+/* ── CSRF helper ──────────────────────────────────────────────────────────── */
 function getCookie(name) {
   const value = `; ${document.cookie}`;
   const parts = value.split(`; ${name}=`);
@@ -10,13 +13,29 @@ function getCookie(name) {
   return '';
 }
 
-// ── Toast notification ─────────────────────────────────────────────────────────
+/* ── Global loading indicator ─────────────────────────────────────────────── */
+const Loader = {
+  el: null,
+  init() {
+    this.el = document.getElementById('global-loader');
+  },
+  show() {
+    this.el?.classList.remove('d-none');
+  },
+  hide() {
+    this.el?.classList.add('d-none');
+  },
+};
+
+/* ── Toast notification ───────────────────────────────────────────────────── */
 function showToast(message, type = 'success') {
   const container = document.getElementById('toast-container') || (() => {
     const c = document.createElement('div');
     c.id = 'toast-container';
     c.className = 'position-fixed bottom-0 end-0 p-3';
     c.style.zIndex = '9999';
+    c.setAttribute('aria-live', 'polite');
+    c.setAttribute('aria-atomic', 'true');
     document.body.appendChild(c);
     return c;
   })();
@@ -27,389 +46,169 @@ function showToast(message, type = 'success') {
     warning: 'bi-exclamation-triangle-fill text-warning',
     info:    'bi-info-circle-fill text-info',
   };
-
   const id = `toast-${Date.now()}`;
   container.insertAdjacentHTML('beforeend', `
-    <div id="${id}" class="toast align-items-center border-0 shadow" role="alert" aria-live="assertive">
+    <div id="${id}" class="toast align-items-center border-0 shadow" role="alert" aria-live="assertive" aria-atomic="true">
       <div class="d-flex">
         <div class="toast-body d-flex align-items-center gap-2">
-          <i class="bi ${icons[type] || icons.info} flex-shrink-0"></i>
+          <i class="bi ${icons[type] || icons.info} flex-shrink-0" aria-hidden="true"></i>
           <span>${message}</span>
         </div>
-        <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button>
+        <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
       </div>
     </div>
   `);
-
   const toastEl = document.getElementById(id);
   const toast   = new bootstrap.Toast(toastEl, { delay: 3500 });
   toast.show();
   toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// Document Ready
-// ══════════════════════════════════════════════════════════════════════════════
-document.addEventListener('DOMContentLoaded', () => {
+/* ══════════════════════════════════════════════════════════════════════════
+   Unified Modal API
+   Controls the single #unifiedModal for ALL CRUD / confirm operations.
+   ══════════════════════════════════════════════════════════════════════════ */
+const UnifiedModal = {
+  // Icon map per operation type
+  _icons: {
+    create:   { cls: 'bi-plus-circle-fill text-primary',           btn: 'btn-primary',     confirmIcon: 'bi-check-lg',  confirmText: 'Create'  },
+    edit:     { cls: 'bi-pencil-square text-primary',              btn: 'btn-primary',     confirmIcon: 'bi-check-lg',  confirmText: 'Save'    },
+    delete:   { cls: 'bi-exclamation-triangle-fill text-danger',   btn: 'btn-danger',      confirmIcon: 'bi-trash',     confirmText: 'Delete'  },
+    hide:     { cls: 'bi-eye-slash-fill text-warning',             btn: 'btn-warning',     confirmIcon: 'bi-eye-slash', confirmText: 'Hide'    },
+    unhide:   { cls: 'bi-eye-fill text-success',                   btn: 'btn-success',     confirmIcon: 'bi-eye',       confirmText: 'Unhide'  },
+    confirm:  { cls: 'bi-question-circle-fill text-primary',       btn: 'btn-primary',     confirmIcon: 'bi-check-lg',  confirmText: 'Confirm' },
+    warning:  { cls: 'bi-exclamation-triangle-fill text-warning',  btn: 'btn-warning',     confirmIcon: 'bi-check-lg',  confirmText: 'Proceed' },
+  },
 
-  /* ── 1. Confirmation modal (data-confirm-url) ─────────────────────────── */
-  document.querySelectorAll('[data-confirm-url]').forEach(btn => {
-    btn.addEventListener('click', e => {
-      e.preventDefault();
-      const modal  = document.getElementById('confirmModal');
-      const form   = document.getElementById('confirmModalForm');
-      const body   = document.getElementById('confirmModalBody');
-      const title  = document.getElementById('confirmModalTitle');
-      const action = btn.dataset.confirmAction || 'Delete';
+  _modal: null,
+  _confirmCallback: null,
 
-      body.textContent  = btn.dataset.confirmMessage || 'Are you sure?';
-      title.textContent = action;
-      form.action       = btn.dataset.confirmUrl;
-      bootstrap.Modal.getOrCreateInstance(modal).show();
+  init() {
+    const el = document.getElementById('unifiedModal');
+    if (!el) return;
+    this._modal = bootstrap.Modal.getOrCreateInstance(el);
+
+    // Size control — large for forms, default for confirms
+    el.addEventListener('show.bs.modal', () => {
+      const dialog = document.getElementById('unifiedModalDialog');
+      dialog.classList.toggle('modal-lg', !!this._isForm);
     });
-  });
 
-  /* ── 2. AJAX Cascade: Topic → Category → Subcategory ──────────────────── */
-  const topicSelect    = document.getElementById('id_topic');
-  const categorySelect = document.getElementById('id_category');
-  const subcatSelect   = document.getElementById('id_subcategory');
+    document.getElementById('unifiedModalConfirmBtn')
+      ?.addEventListener('click', () => this._handleConfirm());
+  },
 
-  function enableSelect(el, placeholder) {
-    el.disabled  = false;
-    el.innerHTML = `<option value="">${placeholder}</option>`;
-  }
-  function disableSelect(el, placeholder) {
-    el.disabled  = true;
-    el.innerHTML = `<option value="">${placeholder}</option>`;
-  }
+  /** Show a simple confirmation modal (no form). */
+  confirm({ title, message, type = 'confirm', onConfirm }) {
+    this._isForm = false;
+    this._confirmCallback = onConfirm;
+    this._applyMeta(title, type);
+    this._setContent(`<p class="mb-0">${message}</p>`);
+    this._clearAlert();
+    this._modal?.show();
+  },
 
-  if (topicSelect) {
-    topicSelect.addEventListener('change', async () => {
-      const topicId = topicSelect.value;
-      disableSelect(categorySelect, '— Select Category —');
-      disableSelect(subcatSelect,   '— Select Subcategory —');
-      updateSubmitButton();
-      if (!topicId) return;
+  /** Show a form-based modal for create / edit. */
+  form({ title, html, type = 'create', onConfirm }) {
+    this._isForm = true;
+    this._confirmCallback = onConfirm;
+    this._applyMeta(title, type);
+    this._setContent(html);
+    this._clearAlert();
+    this._modal?.show();
+  },
 
-      const res  = await fetch(`/ajax/categories/?topic_id=${topicId}`,
-                               { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-      const data = await res.json();
-      enableSelect(categorySelect, '— Select Category —');
-      data.categories.forEach(c => {
-        categorySelect.insertAdjacentHTML('beforeend',
-          `<option value="${c.id}">${c.name}</option>`);
-      });
-      updateSubmitButton();
-    });
-  }
+  /** Show the loading skeleton inside the body. */
+  showLoader() {
+    document.getElementById('unifiedModalLoader')?.classList.remove('d-none');
+    document.getElementById('unifiedModalContent').innerHTML = '';
+  },
 
-  if (categorySelect) {
-    categorySelect.addEventListener('change', async () => {
-      const catId = categorySelect.value;
-      disableSelect(subcatSelect, '— Select Subcategory —');
-      updateSubmitButton();
-      if (!catId) return;
+  /** Hide loading skeleton, inject content. */
+  hideLoader(html) {
+    document.getElementById('unifiedModalLoader')?.classList.add('d-none');
+    this._setContent(html);
+  },
 
-      const res  = await fetch(`/ajax/subcategories/?category_id=${catId}`,
-                               { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-      const data = await res.json();
-      enableSelect(subcatSelect, '— Select Subcategory —');
-      data.subcategories.forEach(s => {
-        subcatSelect.insertAdjacentHTML('beforeend',
-          `<option value="${s.id}">${s.name}</option>`);
-      });
-      updateSubmitButton();
-    });
-  }
+  showAlert(message, type = 'danger') {
+    const el = document.getElementById('unifiedModalAlert');
+    if (!el) return;
+    el.className = `alert alert-${type} rounded-3 py-2 px-3 small mb-2`;
+    el.innerHTML = `<i class="bi bi-exclamation-circle me-1" aria-hidden="true"></i>${message}`;
+    el.classList.remove('d-none');
+  },
 
-  if (subcatSelect) {
-    subcatSelect.addEventListener('change', updateSubmitButton);
-  }
+  hide() {
+    this._modal?.hide();
+  },
 
-  /* ── 3. Character counter + pair estimate for bulk textarea ───────────── */
-  const rawText      = document.getElementById('id_raw_text');
-  const charCount    = document.getElementById('charCount');
-  const pairEstimate = document.getElementById('pairEstimate');
+  _applyMeta(title, type) {
+    const cfg = this._icons[type] || this._icons.confirm;
+    document.getElementById('unifiedModalTitleText').textContent = title;
+    document.getElementById('unifiedModalIcon').innerHTML =
+      `<i class="bi ${cfg.cls}" aria-hidden="true"></i>`;
 
-  if (rawText) {
-    rawText.addEventListener('input', () => {
-      const chars = rawText.value.length;
-      if (charCount) charCount.textContent = `${chars.toLocaleString()} characters`;
-      if (pairEstimate) {
-        const est = estimatePairCount(rawText.value);
-        pairEstimate.textContent = est > 0 ? `~${est} Q&A pair${est !== 1 ? 's' : ''} detected` : '';
+    const btn = document.getElementById('unifiedModalConfirmBtn');
+    btn.className = `btn ${cfg.btn}`;
+    document.getElementById('unifiedModalConfirmIcon').className = `bi ${cfg.confirmIcon} me-1`;
+    document.getElementById('unifiedModalConfirmText').textContent = cfg.confirmText;
+  },
+
+  _setContent(html) {
+    document.getElementById('unifiedModalContent').innerHTML = html;
+  },
+
+  _clearAlert() {
+    const el = document.getElementById('unifiedModalAlert');
+    if (el) { el.className = 'd-none'; el.innerHTML = ''; }
+  },
+
+  _setLoading(loading) {
+    const spinner = document.getElementById('unifiedModalSpinner');
+    const btn     = document.getElementById('unifiedModalConfirmBtn');
+    const txt     = document.getElementById('unifiedModalConfirmText');
+    spinner?.classList.toggle('d-none', !loading);
+    if (btn) btn.disabled = loading;
+    if (txt) txt.textContent = loading ? 'Working…' : (this._icons[this._currentType]?.confirmText || 'Confirm');
+  },
+
+  async _handleConfirm() {
+    if (typeof this._confirmCallback === 'function') {
+      this._setLoading(true);
+      try {
+        await this._confirmCallback();
+      } finally {
+        this._setLoading(false);
       }
-      updateSubmitButton();
-    });
-  }
-
-  /* ── 4. Enable preview + submit only when all fields filled ──────────── */
-  function updateSubmitButton() {
-    const previewBtn = document.getElementById('previewBtn');
-    const submitBtn  = document.getElementById('submitBtn');
-    const ready = subcatSelect?.value
-               && rawText?.value.trim().length > 20;
-
-    if (previewBtn) previewBtn.disabled = !ready;
-    if (submitBtn)  submitBtn.disabled  = !ready;
-  }
-
-  /* ── 5. Preview modal ─────────────────────────────────────────────────── */
-  const previewBtn = document.getElementById('previewBtn');
-  const bulkForm   = document.getElementById('bulkUploadForm');
-
-  if (previewBtn && bulkForm) {
-    previewBtn.addEventListener('click', () => {
-      const text  = rawText ? rawText.value : '';
-      const count = estimatePairCount(text);
-      const el    = document.getElementById('previewCount');
-      const sub   = document.getElementById('previewSubcat');
-      if (el)  el.textContent  = count;
-      if (sub) sub.textContent =
-        subcatSelect?.options[subcatSelect.selectedIndex]?.text || '?';
-      bootstrap.Modal.getOrCreateInstance(
-        document.getElementById('uploadConfirmModal')).show();
-    });
-  }
-
-  const confirmUploadBtn = document.getElementById('confirmUploadBtn');
-  if (confirmUploadBtn && bulkForm) {
-    confirmUploadBtn.addEventListener('click', () => {
-      bootstrap.Modal.getInstance(
-        document.getElementById('uploadConfirmModal'))?.hide();
-      bulkForm.submit();
-    });
-  }
-
-  function estimatePairCount(text) {
-    const explicit = (text.match(/\bQ\s*\d*\s*[:\.\)]/gi) || []).length;
-    if (explicit > 0) return explicit;
-    const numbered = (text.match(/^\s*\d+[\.\)]\s+\S/gm) || []).length;
-    if (numbered > 0) return numbered;
-    const paras = text.split(/\n{2,}/).filter(p => p.trim().length > 10);
-    return Math.floor(paras.length / 2);
-  }
-
-  /* ── 6. Favorites (AJAX) ─────────────────────────────────────────────── */
-  document.querySelectorAll('.fav-btn').forEach(btn => {
-    btn.addEventListener('click', async function(e) {
-      e.preventDefault();
-      const ct   = this.dataset.contentType;
-      const oid  = this.dataset.objectId;
-      const icon = this.querySelector('i');
-
-      const resp = await fetch('/ajax/favorites/', {
-        method: 'POST',
-        headers: {
-          'Content-Type':     'application/json',
-          'X-CSRFToken':      getCookie('csrftoken'),
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        body: JSON.stringify({ content_type: ct, object_id: oid }),
-      });
-      const data = await resp.json();
-      if (data.success) {
-        if (data.favorited) {
-          icon.className = icon.className.replace('bi-star', 'bi-star-fill');
-          icon.classList.add('text-warning');
-          this.classList.remove('btn-outline-warning');
-          this.classList.add('btn-warning');
-        } else {
-          icon.className = icon.className.replace('bi-star-fill', 'bi-star');
-          icon.classList.remove('text-warning');
-          this.classList.remove('btn-warning');
-          this.classList.add('btn-outline-warning');
-        }
-        showToast(data.message, data.favorited ? 'success' : 'info');
-      }
-    });
-  });
-
-  /* ── 7. AJAX Hide ────────────────────────────────────────────────────── */
-  document.querySelectorAll('.ajax-hide').forEach(btn => {
-    btn.addEventListener('click', async function() {
-      const { type, id, name } = this.dataset;
-      const result = await Swal.fire({
-        title:              `Hide "${name}"?`,
-        html:               'All child items will also be hidden from users.',
-        icon:               'warning',
-        showCancelButton:   true,
-        confirmButtonColor: '#f59e0b',
-        confirmButtonText:  '<i class="bi bi-eye-slash me-1"></i>Hide',
-        cancelButtonText:   'Cancel',
-      });
-      if (!result.isConfirmed) return;
-
-      const resp = await fetch(`/ajax/${type}s/${id}/hide/`, {
-        method:  'POST',
-        headers: { 'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest' },
-      });
-      const data = await resp.json();
-      if (data.success) {
-        showToast(data.message, 'warning');
-        // Update button in place
-        const row = document.getElementById(`row-${id}`) ||
-                    document.getElementById(`cat-${id}`) ||
-                    document.getElementById(`sub-${id}`) ||
-                    document.getElementById(`q-${id}`);
-        if (row) {
-          const badge = row.querySelector('.hidden-badge') || (() => {
-            const b = document.createElement('span');
-            b.className = 'badge bg-secondary ms-1 hidden-badge';
-            b.innerHTML = '<i class="bi bi-eye-slash"></i> Hidden';
-            return b;
-          })();
-          const nameEl = row.querySelector('a, .fw-medium, .fw-semibold');
-          if (nameEl) nameEl.after(badge);
-          this.className = this.className.replace('ajax-hide btn-outline-warning', 'ajax-unhide btn-outline-success');
-          this.innerHTML = '<i class="bi bi-eye"></i>';
-          this.dataset.oldHandler = 'hide';
-          // Re-bind unhide
-          this.addEventListener('click', handleUnhideClick);
-          this.removeEventListener('click', handleHideClick);
-        } else {
-          setTimeout(() => location.reload(), 700);
-        }
-      } else {
-        showToast(data.error, 'danger');
-      }
-    });
-  });
-
-  /* ── 8. AJAX Unhide ──────────────────────────────────────────────────── */
-  document.querySelectorAll('.ajax-unhide').forEach(btn => {
-    btn.addEventListener('click', handleUnhideClick);
-  });
-
-  async function handleUnhideClick() {
-    const { type, id } = this.dataset;
-    const resp = await fetch(`/ajax/${type}s/${id}/unhide/`, {
-      method:  'POST',
-      headers: { 'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest' },
-    });
-    const data = await resp.json();
-    if (data.success) {
-      showToast(data.message, 'success');
-      setTimeout(() => location.reload(), 700);
-    } else {
-      await Swal.fire('Cannot Unhide', data.error, 'error');
     }
-  }
+  },
+};
 
-  async function handleHideClick() { /* handled inline above */ }
-
-  /* ── 9. AJAX Delete ──────────────────────────────────────────────────── */
-  document.querySelectorAll('.ajax-delete').forEach(btn => {
-    btn.addEventListener('click', async function() {
-      const { type, id, name } = this.dataset;
-      const result = await Swal.fire({
-        title:              `Delete "${name}"?`,
-        html:               '<span class="text-danger">Permanent — all children will be deleted too.</span>',
-        icon:               'error',
-        showCancelButton:   true,
-        confirmButtonColor: '#ef4444',
-        confirmButtonText:  '<i class="bi bi-trash me-1"></i>Delete permanently',
-        cancelButtonText:   'Cancel',
-      });
-      if (!result.isConfirmed) return;
-
-      const urlMap = {
-        topic:       `/ajax/topics/${id}/delete/`,
-        category:    `/ajax/categories/${id}/delete/`,
-        subcategory: `/ajax/subcategories/${id}/delete/`,
-        question:    `/ajax/questions/${id}/delete/`,
-      };
-      const url = urlMap[type];
-      if (!url) return;
-
-      const resp = await fetch(url, {
-        method:  'POST',
-        headers: { 'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest' },
-      });
-      const data = await resp.json();
-      if (data.success) {
-        showToast(data.message, 'success');
-        const row = document.getElementById(`row-${id}`) ||
-                    document.getElementById(`cat-${id}`) ||
-                    document.getElementById(`sub-${id}`) ||
-                    document.getElementById(`q-${id}`);
-        if (row) {
-          row.style.transition = 'opacity 0.3s';
-          row.style.opacity    = '0';
-          setTimeout(() => row.remove(), 300);
-        } else {
-          setTimeout(() => location.reload(), 700);
-        }
-      } else {
-        showToast(data.error || 'Delete failed', 'danger');
-      }
-    });
-  });
-
-  /* ── 10. CRUD Modal (Create/Edit) ────────────────────────────────────── */
-  document.querySelectorAll('[data-crud-action]').forEach(btn => {
-    btn.addEventListener('click', () =>
-      openCrudModal(btn.dataset.crudAction, btn.dataset.crudType, btn.dataset.crudId));
-  });
-
-  /* ── 11. Auto-dismiss flash messages ────────────────────────────────── */
-  document.querySelectorAll('.alert-dismissible').forEach(alert => {
-    setTimeout(() => {
-      bootstrap.Alert.getOrCreateInstance(alert)?.close();
-    }, 5000);
-  });
-
-  /* ── 12. Prevent back-button cache ──────────────────────────────────── */
-  window.addEventListener('pageshow', e => {
-    if (e.persisted) window.location.reload();
-  });
-
-  /* ── 13. Table search for admin dashboard ────────────────────────────── */
-  document.getElementById('tableSearch')?.addEventListener('input', function() {
-    const q = this.value.toLowerCase();
-    document.querySelectorAll('.content-row').forEach(row => {
-      row.style.display = (row.dataset.name || '').includes(q) ? '' : 'none';
-    });
-  });
-
-});  // end DOMContentLoaded
-
-
-// ══════════════════════════════════════════════════════════════════════════════
-// CRUD Modal — exposed globally so templates can call openCrudModal(...)
-// ══════════════════════════════════════════════════════════════════════════════
+/* ══════════════════════════════════════════════════════════════════════════
+   CRUD Modal — openCrudModal() exposed globally for inline template calls
+   ══════════════════════════════════════════════════════════════════════════ */
 window.openCrudModal = async function(action, type, id) {
-  const modalEl  = document.getElementById('crudModal');
-  if (!modalEl) return;
-  const modal    = bootstrap.Modal.getOrCreateInstance(modalEl);
-  const titleEl  = document.getElementById('crudModalTitleText');
-  const bodyEl   = document.getElementById('crudModalBody');
-  const saveBtn  = document.getElementById('crudModalSaveBtn');
-  const spinner  = document.getElementById('crudSaveSpinner');
-  const saveTxt  = document.getElementById('crudSaveBtnText');
-
   const label = type.charAt(0).toUpperCase() + type.slice(1);
-  titleEl.textContent = `${action === 'edit' ? 'Edit' : 'Create'} ${label}`;
-  bodyEl.innerHTML    = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
-  modal.show();
+  const title = `${action === 'edit' ? 'Edit' : 'Create'} ${label}`;
+
+  UnifiedModal.form({ title, html: '', type: action === 'edit' ? 'edit' : 'create', onConfirm: null });
+  UnifiedModal.showLoader();
 
   let currentData = {};
   if (action === 'edit' && id) {
     try {
-      const resp  = await fetch(`/ajax/${type}s/${id}/edit/`,
-                                { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-      currentData = await resp.json();
-    } catch (e) { /* ignore */ }
+      const r = await fetch(`/ajax/${type}s/${id}/edit/`,
+        { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      currentData = await r.json();
+    } catch (_) { /* ignore, proceed with empty */ }
   }
 
-  bodyEl.innerHTML = buildCrudForm(type, currentData);
+  const formHtml = buildCrudForm(type, currentData);
+  UnifiedModal.hideLoader(formHtml);
   await initDependentSelects(type, currentData);
 
-  saveBtn.onclick = async () => {
-    spinner.classList.remove('d-none');
-    saveTxt.textContent = 'Saving…';
-    saveBtn.disabled    = true;
-
+  // Wire up confirm button
+  UnifiedModal._confirmCallback = async () => {
     const formData = new FormData(document.getElementById('crudInlineForm'));
     const url = action === 'edit'
       ? `/ajax/${type}s/${id}/edit/`
@@ -422,149 +221,537 @@ window.openCrudModal = async function(action, type, id) {
     });
     const data = await resp.json();
 
-    spinner.classList.add('d-none');
-    saveTxt.textContent = 'Save';
-    saveBtn.disabled    = false;
-
     if (data.success) {
-      modal.hide();
+      UnifiedModal.hide();
       showToast(data.message, 'success');
       setTimeout(() => location.reload(), 600);
     } else {
-      // Show error inside modal
-      const existing = bodyEl.querySelector('.crud-error');
-      if (existing) existing.remove();
-      bodyEl.insertAdjacentHTML('afterbegin',
-        `<div class="alert alert-danger rounded-3 py-2 px-3 small crud-error">
-           <i class="bi bi-exclamation-circle me-1"></i>${data.error || JSON.stringify(data)}
-         </div>`);
+      UnifiedModal.showAlert(data.error || JSON.stringify(data));
     }
   };
 };
 
+/* ── Build CRUD form HTML ─────────────────────────────────────────────────── */
 function buildCrudForm(type, data) {
   const statusOptions = ['pending', 'approved', 'rejected']
     .map(s => `<option value="${s}" ${data.status === s ? 'selected' : ''}>${s.charAt(0).toUpperCase() + s.slice(1)}</option>`)
     .join('');
 
   let fields = '';
-
   if (type === 'topic') {
     fields = `
       <div class="mb-3">
-        <label class="form-label fw-medium">Name <span class="text-danger">*</span></label>
-        <input type="text" name="name" class="form-control" value="${escHtml(data.name || '')}" required>
+        <label class="form-label fw-medium" for="crudName">Name <span class="text-danger" aria-hidden="true">*</span></label>
+        <input type="text" id="crudName" name="name" class="form-control" value="${escHtml(data.name || '')}" required aria-required="true">
       </div>
       <div class="mb-3">
-        <label class="form-label fw-medium">Description</label>
-        <textarea name="description" class="form-control" rows="3">${escHtml(data.description || '')}</textarea>
+        <label class="form-label fw-medium" for="crudDesc">Description</label>
+        <textarea id="crudDesc" name="description" class="form-control" rows="3">${escHtml(data.description || '')}</textarea>
       </div>
       <div class="mb-3">
-        <label class="form-label fw-medium">Status</label>
-        <select name="status" class="form-select">${statusOptions}</select>
+        <label class="form-label fw-medium" for="crudStatus">Status</label>
+        <select id="crudStatus" name="status" class="form-select">${statusOptions}</select>
       </div>`;
-
   } else if (type === 'category') {
     fields = `
       <div class="mb-3">
-        <label class="form-label fw-medium">Topic <span class="text-danger">*</span></label>
-        <select name="topic" class="form-select" id="modal_topic_sel" required>
+        <label class="form-label fw-medium" for="modal_topic_sel">Topic <span class="text-danger" aria-hidden="true">*</span></label>
+        <select id="modal_topic_sel" name="topic" class="form-select" required aria-required="true">
           <option value="">— Loading topics… —</option>
         </select>
       </div>
       <div class="mb-3">
-        <label class="form-label fw-medium">Name <span class="text-danger">*</span></label>
-        <input type="text" name="name" class="form-control" value="${escHtml(data.name || '')}" required>
+        <label class="form-label fw-medium" for="crudName">Name <span class="text-danger" aria-hidden="true">*</span></label>
+        <input type="text" id="crudName" name="name" class="form-control" value="${escHtml(data.name || '')}" required aria-required="true">
       </div>
       <div class="mb-3">
-        <label class="form-label fw-medium">Description</label>
-        <textarea name="description" class="form-control" rows="3">${escHtml(data.description || '')}</textarea>
+        <label class="form-label fw-medium" for="crudDesc">Description</label>
+        <textarea id="crudDesc" name="description" class="form-control" rows="3">${escHtml(data.description || '')}</textarea>
       </div>
       <div class="mb-3">
-        <label class="form-label fw-medium">Status</label>
-        <select name="status" class="form-select">${statusOptions}</select>
+        <label class="form-label fw-medium" for="crudStatus">Status</label>
+        <select id="crudStatus" name="status" class="form-select">${statusOptions}</select>
       </div>`;
-
   } else if (type === 'subcategory') {
     fields = `
       <div class="mb-3">
-        <label class="form-label fw-medium">Category <span class="text-danger">*</span></label>
-        <select name="category" class="form-select" id="modal_category_sel" required>
+        <label class="form-label fw-medium" for="modal_category_sel">Category <span class="text-danger" aria-hidden="true">*</span></label>
+        <select id="modal_category_sel" name="category" class="form-select" required aria-required="true">
           <option value="">— Loading categories… —</option>
         </select>
       </div>
       <div class="mb-3">
-        <label class="form-label fw-medium">Name <span class="text-danger">*</span></label>
-        <input type="text" name="name" class="form-control" value="${escHtml(data.name || '')}" required>
+        <label class="form-label fw-medium" for="crudName">Name <span class="text-danger" aria-hidden="true">*</span></label>
+        <input type="text" id="crudName" name="name" class="form-control" value="${escHtml(data.name || '')}" required aria-required="true">
       </div>
       <div class="mb-3">
-        <label class="form-label fw-medium">Status</label>
-        <select name="status" class="form-select">${statusOptions}</select>
+        <label class="form-label fw-medium" for="crudStatus">Status</label>
+        <select id="crudStatus" name="status" class="form-select">${statusOptions}</select>
+      </div>`;
+  } else if (type === 'question') {
+    fields = `
+      <div class="mb-3">
+        <label class="form-label fw-medium" for="modal_subcat_sel">Subcategory <span class="text-danger" aria-hidden="true">*</span></label>
+        <select id="modal_subcat_sel" name="subcategory" class="form-select" required aria-required="true">
+          <option value="">— Loading… —</option>
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-medium" for="crudTitle">Question <span class="text-danger" aria-hidden="true">*</span></label>
+        <textarea id="crudTitle" name="title" class="form-control" rows="4" required aria-required="true">${escHtml(data.title || '')}</textarea>
       </div>`;
   }
 
-  return `<form id="crudInlineForm">${fields}</form>`;
+  return `<form id="crudInlineForm" novalidate>${fields}</form>`;
 }
 
+/* ── Populate dependent selects inside the modal ─────────────────────────── */
 async function initDependentSelects(type, data) {
   if (type === 'category') {
-    // Populate topics
     const topicSel = document.getElementById('modal_topic_sel');
     if (!topicSel) return;
-    // Grab topics from the page's own topic select, or fetch a list
     const pageSel = document.getElementById('id_topic') ||
                     document.querySelector('select[name="topic"]');
     if (pageSel && pageSel.options.length > 1) {
       topicSel.innerHTML = '<option value="">— Select Topic —</option>';
       Array.from(pageSel.options).slice(1).forEach(o => {
         topicSel.insertAdjacentHTML('beforeend',
-          `<option value="${o.value}" ${o.value === data.topic_id ? 'selected' : ''}>${o.text}</option>`);
+          `<option value="${o.value}" ${o.value === String(data.topic_id) ? 'selected' : ''}>${escHtml(o.text)}</option>`);
       });
     }
-
   } else if (type === 'subcategory') {
-    // Need to populate all categories
     const catSel = document.getElementById('modal_category_sel');
     if (!catSel) return;
-    // We'll fetch via a topic-agnostic approach: use page's own category selects
+    catSel.innerHTML = '<option value="">— Select Category —</option>';
+    // Try to pull from page's existing select
     const pageCatSel = document.getElementById('id_category') ||
                        document.querySelector('select[name="category"]');
     if (pageCatSel && pageCatSel.options.length > 1) {
-      catSel.innerHTML = '<option value="">— Select Category —</option>';
       Array.from(pageCatSel.options).slice(1).forEach(o => {
         catSel.insertAdjacentHTML('beforeend',
-          `<option value="${o.value}" ${o.value === data.category_id ? 'selected' : ''}>${o.text}</option>`);
+          `<option value="${o.value}" ${o.value === String(data.category_id) ? 'selected' : ''}>${escHtml(o.text)}</option>`);
       });
     } else {
-      // Fetch from all approved topics' categories
-      catSel.innerHTML = '<option value="">— Select Category —</option>';
-      // Iterate known topics on dashboard rows
-      const topicIds = [...new Set(
-        Array.from(document.querySelectorAll('[data-topic-id]')).map(el => el.dataset.topicId)
-      )];
-      if (topicIds.length === 0) {
-        // No topic ids available, try fetching categories for all topics
-        // This is best-effort; in production supply a /ajax/all-categories/ endpoint
-        catSel.innerHTML = '<option value="">— No categories available —</option>';
-        return;
-      }
-      for (const tid of topicIds) {
-        const r = await fetch(`/ajax/categories/?topic_id=${tid}`);
+      // Fetch all categories from the server
+      try {
+        const r = await fetch('/ajax/all-categories/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
         const d = await r.json();
-        d.categories.forEach(c => {
+        (d.categories || []).forEach(c => {
           catSel.insertAdjacentHTML('beforeend',
-            `<option value="${c.id}" ${c.id === data.category_id ? 'selected' : ''}>${c.name}</option>`);
+            `<option value="${c.id}" ${c.id === data.category_id ? 'selected' : ''}>${escHtml(c.name)}</option>`);
         });
-      }
+      } catch (_) { catSel.innerHTML = '<option value="">— No categories available —</option>'; }
     }
+  } else if (type === 'question') {
+    const subSel = document.getElementById('modal_subcat_sel');
+    if (!subSel) return;
+    try {
+      const r = await fetch('/ajax/all-subcategories/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      const d = await r.json();
+      subSel.innerHTML = '<option value="">— Select Subcategory —</option>';
+      (d.subcategories || []).forEach(s => {
+        subSel.insertAdjacentHTML('beforeend',
+          `<option value="${s.id}" ${s.id === data.subcategory_id ? 'selected' : ''}>${escHtml(s.name)}</option>`);
+      });
+    } catch (_) { subSel.innerHTML = '<option value="">— Error loading subcategories —</option>'; }
   }
 }
 
+/* ── Escape HTML helper ──────────────────────────────────────────────────── */
 function escHtml(str) {
   return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   AJAX helpers — shared across all templates via class selectors
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** Generic AJAX POST, returns parsed JSON */
+async function ajaxPost(url, extraHeaders = {}) {
+  const resp = await fetch(url, {
+    method:  'POST',
+    headers: {
+      'X-CSRFToken':      getCookie('csrftoken'),
+      'X-Requested-With': 'XMLHttpRequest',
+      ...extraHeaders,
+    },
+  });
+  return resp.json();
+}
+
+/** Delete URL map — single source of truth */
+function getDeleteUrl(type, id) {
+  const map = {
+    topic:        `/ajax/topics/${id}/delete/`,
+    category:     `/ajax/categories/${id}/delete/`,
+    subcategory:  `/ajax/subcategories/${id}/delete/`,
+    question:     `/ajax/questions/${id}/delete/`,
+    answer:       `/answers/${id}/delete/`,
+    bulk_upload:  `/answers/${id}/delete/`,
+  };
+  return map[type] || '#';
+}
+
+/** Remove a row from DOM with fade */
+function removeRow(id, type) {
+  const selectors = [`#row-${id}`, `#cat-${id}`, `#sub-${id}`, `#q-${id}`, `#answer-${id}`];
+  for (const sel of selectors) {
+    const el = document.querySelector(sel);
+    if (el) {
+      el.style.transition = 'opacity 0.3s';
+      el.style.opacity = '0';
+      setTimeout(() => el.remove(), 310);
+      return true;
+    }
+  }
+  return false;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DOMContentLoaded — wire up all global event handlers
+   ══════════════════════════════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+
+  /* ── Init modules ─────────────────────────────────────────────────────── */
+  Loader.init();
+  UnifiedModal.init();
+
+  /* ── 1. Auto-dismiss flash messages ──────────────────────────────────── */
+  document.querySelectorAll('.auto-dismiss-alert').forEach(alert => {
+    const delay = parseInt(alert.dataset.autoDismiss, 10) || 4000;
+    setTimeout(() => {
+      const bsAlert = bootstrap.Alert.getOrCreateInstance(alert);
+      bsAlert?.close();
+    }, delay);
+  });
+
+  /* ── 2. Global loading indicator on navigation / form submit ─────────── */
+  // Show on all standard <a> navigations (except targets, anchors, modals)
+  document.addEventListener('click', e => {
+    const anchor = e.target.closest('a[href]');
+    if (
+      anchor &&
+      !anchor.href.startsWith('#') &&
+      !anchor.target &&
+      !anchor.dataset.bsToggle &&
+      !e.ctrlKey && !e.metaKey && !e.shiftKey
+    ) {
+      Loader.show();
+    }
+  });
+  // Show on form submit
+  document.addEventListener('submit', e => {
+    if (!e.target.dataset.noLoader) Loader.show();
+  });
+  // Hide on pageshow (back-button or bfcache restore)
+  window.addEventListener('pageshow', e => {
+    Loader.hide();
+    if (e.persisted) window.location.reload();
+  });
+
+  /* ── 3. CRUD modal trigger buttons ───────────────────────────────────── */
+  document.querySelectorAll('[data-crud-action]').forEach(btn => {
+    btn.addEventListener('click', () =>
+      openCrudModal(btn.dataset.crudAction, btn.dataset.crudType, btn.dataset.crudId));
+  });
+
+  /* ── 4. Confirmation modal (data-confirm-url, legacy support) ─────────── */
+  document.querySelectorAll('[data-confirm-url]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      UnifiedModal.confirm({
+        title:    btn.dataset.confirmAction || 'Confirm',
+        message:  btn.dataset.confirmMessage || 'Are you sure?',
+        type:     'confirm',
+        onConfirm: async () => {
+          Loader.show();
+          const form = document.createElement('form');
+          form.method = 'POST';
+          form.action = btn.dataset.confirmUrl;
+          const csrf = document.createElement('input');
+          csrf.type = 'hidden'; csrf.name = 'csrfmiddlewaretoken'; csrf.value = getCookie('csrftoken');
+          form.appendChild(csrf);
+          document.body.appendChild(form);
+          form.submit();
+        },
+      });
+    });
+  });
+
+  /* ── 5. Favorites (AJAX) ─────────────────────────────────────────────── */
+  document.querySelectorAll('.fav-btn').forEach(btn => {
+    btn.addEventListener('click', async function(e) {
+      e.preventDefault();
+      const ct   = this.dataset.contentType;
+      const oid  = this.dataset.objectId;
+      const icon = this.querySelector('i');
+
+      try {
+        const resp = await fetch('/ajax/favorites/', {
+          method: 'POST',
+          headers: {
+            'Content-Type':     'application/json',
+            'X-CSRFToken':      getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          body: JSON.stringify({ content_type: ct, object_id: oid }),
+        });
+        const data = await resp.json();
+        if (data.success) {
+          if (data.favorited) {
+            icon.className = icon.className.replace('bi-star', 'bi-star-fill');
+            icon.classList.add('text-warning');
+            icon.classList.remove('text-muted');
+            this.classList.remove('btn-outline-warning');
+            this.classList.add('btn-warning');
+          } else {
+            icon.className = icon.className.replace('bi-star-fill', 'bi-star');
+            icon.classList.remove('text-warning');
+            icon.classList.add('text-muted');
+            this.classList.remove('btn-warning');
+            this.classList.add('btn-outline-warning');
+          }
+          this.setAttribute('aria-pressed', data.favorited ? 'true' : 'false');
+          showToast(data.message, data.favorited ? 'success' : 'info');
+        }
+      } catch (_) { showToast('Could not update favorite', 'danger'); }
+    });
+  });
+
+  /* ── 6. AJAX Hide ────────────────────────────────────────────────────── */
+  document.querySelectorAll('.ajax-hide').forEach(btn => {
+    btn.addEventListener('click', async function() {
+      const { type, id, name } = this.dataset;
+      UnifiedModal.confirm({
+        title:   `Hide "${name}"?`,
+        message: 'All child items will also be hidden from users.',
+        type:    'hide',
+        onConfirm: async () => {
+          Loader.show();
+          try {
+            const data = await ajaxPost(`/ajax/${type}s/${id}/hide/`);
+            UnifiedModal.hide();
+            Loader.hide();
+            if (data.success) {
+              showToast(data.message, 'warning');
+              setTimeout(() => location.reload(), 700);
+            } else {
+              showToast(data.error || 'Hide failed', 'danger');
+            }
+          } catch (_) { Loader.hide(); showToast('Request failed', 'danger'); }
+        },
+      });
+    });
+  });
+
+  /* ── 7. AJAX Unhide ──────────────────────────────────────────────────── */
+  document.querySelectorAll('.ajax-unhide').forEach(btn => {
+    btn.addEventListener('click', async function() {
+      const { type, id, name } = this.dataset;
+      UnifiedModal.confirm({
+        title:   `Unhide "${name || type}"?`,
+        message: 'This item will become visible to all users.',
+        type:    'unhide',
+        onConfirm: async () => {
+          Loader.show();
+          try {
+            const data = await ajaxPost(`/ajax/${type}s/${id}/unhide/`);
+            UnifiedModal.hide();
+            Loader.hide();
+            if (data.success) {
+              showToast(data.message, 'success');
+              setTimeout(() => location.reload(), 700);
+            } else {
+              showToast(data.error || 'Cannot unhide', 'danger');
+            }
+          } catch (_) { Loader.hide(); showToast('Request failed', 'danger'); }
+        },
+      });
+    });
+  });
+
+  /* ── 8. AJAX Delete ──────────────────────────────────────────────────── */
+  document.querySelectorAll('.ajax-delete').forEach(btn => {
+    btn.addEventListener('click', async function() {
+      const { type, id, name } = this.dataset;
+      const redirect = this.dataset.redirect || null;
+      const deleteUrl = this.dataset.deleteUrl || getDeleteUrl(type, id);
+
+      UnifiedModal.confirm({
+        title:   `Delete "${name}"?`,
+        message: '<span class="text-danger fw-semibold">Permanent — all children will be deleted too. This cannot be undone.</span>',
+        type:    'delete',
+        onConfirm: async () => {
+          Loader.show();
+          try {
+            const resp = await fetch(deleteUrl, {
+              method:  'POST',
+              headers: { 'X-CSRFToken': getCookie('csrftoken'), 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            const data = await resp.json();
+            UnifiedModal.hide();
+            Loader.hide();
+            if (data.success) {
+              showToast(data.message, 'success');
+              if (redirect) {
+                setTimeout(() => { window.location.href = redirect; }, 700);
+              } else if (!removeRow(id, type)) {
+                setTimeout(() => location.reload(), 700);
+              }
+            } else {
+              showToast(data.error || 'Delete failed', 'danger');
+            }
+          } catch (_) { Loader.hide(); showToast('Request failed', 'danger'); }
+        },
+      });
+    });
+  });
+
+  /* ── 9. AJAX Admin approve/reject (pending approvals) ────────────────── */
+  document.querySelectorAll('.ajax-hide, .ajax-unhide, .ajax-delete').forEach(() => {
+    // handled above — no-op, just ensuring querySelectorAll doesn't chain
+  });
+
+  /* ── 10. Cascade: Topic → Category → Subcategory (bulk upload & forms) ── */
+  const topicSelect    = document.getElementById('id_topic');
+  const categorySelect = document.getElementById('id_category');
+  const subcatSelect   = document.getElementById('id_subcategory');
+
+  function enableSelect(el, placeholder) {
+    if (!el) return;
+    el.disabled  = false;
+    el.innerHTML = `<option value="">${placeholder}</option>`;
+  }
+  function disableSelect(el, placeholder) {
+    if (!el) return;
+    el.disabled  = true;
+    el.innerHTML = `<option value="">${placeholder}</option>`;
+  }
+
+  if (topicSelect) {
+    topicSelect.addEventListener('change', async () => {
+      disableSelect(categorySelect, '— Select Category —');
+      disableSelect(subcatSelect,   '— Select Subcategory —');
+      updateBulkSubmit();
+      if (!topicSelect.value) return;
+      const res  = await fetch(`/ajax/categories/?topic_id=${topicSelect.value}`,
+                               { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      const data = await res.json();
+      enableSelect(categorySelect, '— Select Category —');
+      (data.categories || []).forEach(c => {
+        categorySelect.insertAdjacentHTML('beforeend',
+          `<option value="${c.id}">${escHtml(c.name)}</option>`);
+      });
+      updateBulkSubmit();
+    });
+  }
+
+  if (categorySelect) {
+    categorySelect.addEventListener('change', async () => {
+      disableSelect(subcatSelect, '— Select Subcategory —');
+      updateBulkSubmit();
+      if (!categorySelect.value) return;
+      const res  = await fetch(`/ajax/subcategories/?category_id=${categorySelect.value}`,
+                               { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      const data = await res.json();
+      enableSelect(subcatSelect, '— Select Subcategory —');
+      (data.subcategories || []).forEach(s => {
+        subcatSelect.insertAdjacentHTML('beforeend',
+          `<option value="${s.id}">${escHtml(s.name)}</option>`);
+      });
+      updateBulkSubmit();
+    });
+  }
+
+  if (subcatSelect) subcatSelect.addEventListener('change', updateBulkSubmit);
+
+  /* ── 11. Bulk upload: char counter + pair estimate ──────────────────── */
+  const rawText      = document.getElementById('id_raw_text');
+  const charCount    = document.getElementById('charCount');
+  const pairEstimate = document.getElementById('pairEstimate');
+
+  if (rawText) {
+    rawText.addEventListener('input', () => {
+      const chars = rawText.value.length;
+      if (charCount)    charCount.textContent    = `${chars.toLocaleString()} characters`;
+      if (pairEstimate) pairEstimate.textContent =
+        ((est) => est > 0 ? `~${est} Q&A pair${est !== 1 ? 's' : ''} detected` : '')(estimatePairCount(rawText.value));
+      updateBulkSubmit();
+    });
+  }
+
+  function updateBulkSubmit() {
+    const ready = !!subcatSelect?.value && (rawText?.value.trim().length ?? 0) > 20;
+    ['previewBtn', 'submitBtn'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = !ready;
+    });
+  }
+
+  function estimatePairCount(text) {
+    const explicit = (text.match(/\bQ\s*\d*\s*[:\.\)]/gi) || []).length;
+    if (explicit > 0) return explicit;
+    const numbered = (text.match(/^\s*\d+[\.\)]\s+\S/gm) || []).length;
+    if (numbered > 0) return numbered;
+    const paras = text.split(/\n{2,}/).filter(p => p.trim().length > 10);
+    return Math.floor(paras.length / 2);
+  }
+
+  /* ── 12. Bulk upload preview modal ──────────────────────────────────── */
+  const previewBtn = document.getElementById('previewBtn');
+  const bulkForm   = document.getElementById('bulkUploadForm');
+  if (previewBtn && bulkForm) {
+    previewBtn.addEventListener('click', () => {
+      const count = estimatePairCount(rawText?.value || '');
+      document.getElementById('previewCount')?.textContent = count;
+      document.getElementById('previewSubcat')?.textContent =
+        subcatSelect?.options[subcatSelect.selectedIndex]?.text || '?';
+      bootstrap.Modal.getOrCreateInstance(
+        document.getElementById('uploadConfirmModal'))?.show();
+    });
+  }
+
+  const confirmUploadBtn = document.getElementById('confirmUploadBtn');
+  if (confirmUploadBtn && bulkForm) {
+    confirmUploadBtn.addEventListener('click', () => {
+      bootstrap.Modal.getInstance(
+        document.getElementById('uploadConfirmModal'))?.hide();
+      Loader.show();
+      bulkForm.submit();
+    });
+  }
+
+  /* ── 13. Admin table search filter ───────────────────────────────────── */
+  document.getElementById('tableSearch')?.addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    document.querySelectorAll('.content-row').forEach(row => {
+      row.style.display = (row.dataset.name || '').toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+
+  /* ── 14. Login page: password show/hide toggle ──────────────────────── */
+  const togglePw = document.getElementById('togglePw');
+  const pwField  = document.getElementById('id_password');
+  const eyeIcon  = document.getElementById('eyeIcon');
+  if (togglePw && pwField && eyeIcon) {
+    togglePw.addEventListener('click', () => {
+      const isText = pwField.type === 'text';
+      pwField.type = isText ? 'password' : 'text';
+      eyeIcon.className = isText ? 'bi bi-eye' : 'bi bi-eye-slash';
+    });
+  }
+
+  /* ── 15. Login form client-side validation ──────────────────────────── */
+  document.getElementById('loginForm')?.addEventListener('submit', function(e) {
+    let ok = true;
+    ['id_email', 'id_password'].forEach(id => {
+      const f = document.getElementById(id);
+      if (f && !f.value.trim()) { f.classList.add('is-invalid'); ok = false; }
+      else f?.classList.remove('is-invalid');
+    });
+    if (!ok) e.preventDefault();
+  });
+
+}); // end DOMContentLoaded

@@ -8,16 +8,17 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>{% block title %}MindUp{% endblock %}</title>
-
-  <!-- Bootstrap 5 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <!-- Bootstrap Icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-  <!-- Custom styles -->
   <link rel="stylesheet" href="{% static 'css/style.css' %}">
   {% block extra_css %}{% endblock %}
 </head>
 <body class="bg-body-tertiary">
+
+  <!-- ── Global Loading Indicator ───────────────────────────────────────── -->
+  <div id="global-loader" class="global-loader d-none" role="status" aria-label="Loading">
+    <div class="global-loader-bar"></div>
+  </div>
 
   <!-- ── Navbar ─────────────────────────────────────────────────────────── -->
   {% if user.is_authenticated and user.is_admin %}
@@ -30,17 +31,24 @@
   <main class="py-4">
     <div class="container-xl">
 
-      <!-- Flash messages -->
+      <!-- ── Auto-dismiss Flash Messages ─────────────────────────────────── -->
       {% if messages %}
-        <div id="flash-messages" class="mb-3">
+        <div id="flash-messages" class="mb-3" aria-live="polite" aria-atomic="true">
           {% for msg in messages %}
-            <div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show d-flex align-items-center gap-2 rounded-3" role="alert">
-              {% if msg.tags == 'success' %}<i class="bi bi-check-circle-fill text-success"></i>
-              {% elif msg.tags == 'danger' %}<i class="bi bi-x-circle-fill text-danger"></i>
-              {% elif msg.tags == 'warning' %}<i class="bi bi-exclamation-triangle-fill text-warning"></i>
-              {% else %}<i class="bi bi-info-circle-fill text-info"></i>{% endif %}
+            <div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible fade show d-flex align-items-center gap-2 rounded-3 auto-dismiss-alert"
+                 role="alert"
+                 data-auto-dismiss="4000">
+              {% if msg.tags == 'success' %}
+                <i class="bi bi-check-circle-fill text-success flex-shrink-0" aria-hidden="true"></i>
+              {% elif msg.tags == 'danger' or msg.tags == 'error' %}
+                <i class="bi bi-x-circle-fill text-danger flex-shrink-0" aria-hidden="true"></i>
+              {% elif msg.tags == 'warning' %}
+                <i class="bi bi-exclamation-triangle-fill text-warning flex-shrink-0" aria-hidden="true"></i>
+              {% else %}
+                <i class="bi bi-info-circle-fill text-info flex-shrink-0" aria-hidden="true"></i>
+              {% endif %}
               <span>{{ msg }}</span>
-              <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+              <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
           {% endfor %}
         </div>
@@ -50,14 +58,32 @@
     </div>
   </main>
 
-  <!-- ── Footer ─────────────────────────────────────────────────────────── -->
-  {% include "footer.html" %}
+  <!-- ── Footer (inlined from footer.html — file can be deleted) ─────────── -->
+  <footer class="border-top bg-white mt-5 py-4" role="contentinfo">
+    <div class="container-xl d-flex flex-wrap justify-content-between align-items-center gap-3">
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-brain text-primary fs-5" aria-hidden="true"></i>
+        <span class="fw-bold text-primary">MindUp</span>
+        <span class="text-muted small">© {% now "Y" %}</span>
+      </div>
+      <nav aria-label="Footer navigation">
+        <div class="d-flex gap-4 flex-wrap">
+          <a href="{% url 'topic-list' %}"    class="text-muted text-decoration-none small">Topics</a>
+          <a href="{% url 'question-list' %}" class="text-muted text-decoration-none small">Questions</a>
+          <a href="{% url 'search' %}"        class="text-muted text-decoration-none small">Search</a>
+          {% if user.is_authenticated %}
+            <a href="{% url 'favorites' %}"      class="text-muted text-decoration-none small">Favorites</a>
+            <a href="{% url 'bulk-qa-upload' %}" class="text-muted text-decoration-none small">Bulk Upload</a>
+          {% endif %}
+        </div>
+      </nav>
+    </div>
+  </footer>
 
-  <!-- ── Reusable Confirmation Modal ─────────────────────────────────────── -->
-  {% include "confirm_modal.html" %}
+  <!-- ── Toast container (global) ────────────────────────────────────────── -->
+  <div id="toast-container" class="position-fixed bottom-0 end-0 p-3" style="z-index:9999;" aria-live="polite" aria-atomic="true"></div>
 
-  <!-- ── AJAX Create/Edit Modal ──────────────────────────────────────────── -->
-  {% include "crud_modal.html" %}
+  {% include "unified_modal.html" %}
 
   <!-- Bootstrap 5 JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

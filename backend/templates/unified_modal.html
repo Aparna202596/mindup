@@ -1,0 +1,75 @@
+<!-- ══════════════════════════════════════════════════════════════════════
+     unified_modal.html
+     Single reusable modal for ALL operations:
+       • CRUD: Create / Add / Edit / Update / Delete
+       • Visibility: Hide / Unhide
+     Supports: AJAX, dynamic titles/messages/forms, loading states,
+               success/error feedback, accessibility, mobile responsiveness.
+     ══════════════════════════════════════════════════════════════════════ -->
+<div class="modal fade"
+     id="unifiedModal"
+     tabindex="-1"
+     role="dialog"
+     aria-labelledby="unifiedModalTitle"
+     aria-modal="true"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" id="unifiedModalDialog">
+    <div class="modal-content border-0 shadow-lg">
+
+      <!-- Header -->
+      <div class="modal-header border-bottom-0 pb-0">
+        <h5 class="modal-title fw-bold d-flex align-items-center gap-2" id="unifiedModalTitle">
+          <span id="unifiedModalIcon" class="flex-shrink-0" aria-hidden="true">
+            <!-- Icon injected by JS -->
+          </span>
+          <span id="unifiedModalTitleText">Action</span>
+        </h5>
+        <button type="button"
+                class="btn-close"
+                data-bs-dismiss="modal"
+                aria-label="Close modal"></button>
+      </div>
+
+      <!-- Body -->
+      <div class="modal-body pt-2" id="unifiedModalBody">
+        <!-- Loading skeleton shown immediately -->
+        <div id="unifiedModalLoader" class="text-center py-4 d-none">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading…</span>
+          </div>
+          <p class="text-muted small mt-2 mb-0">Please wait…</p>
+        </div>
+
+        <!-- Inline alert for validation / server errors -->
+        <div id="unifiedModalAlert" class="d-none" role="alert" aria-live="assertive"></div>
+
+        <!-- Dynamic content (message text or form) injected here -->
+        <div id="unifiedModalContent"></div>
+      </div>
+
+      <!-- Footer -->
+      <div class="modal-footer border-top-0 pt-0 gap-2">
+        <button type="button"
+                class="btn btn-light"
+                data-bs-dismiss="modal"
+                id="unifiedModalCancelBtn">
+          <i class="bi bi-x-lg me-1" aria-hidden="true"></i>Cancel
+        </button>
+
+        <!-- Confirm / Save button — danger for delete, primary otherwise -->
+        <button type="button"
+                class="btn btn-primary"
+                id="unifiedModalConfirmBtn"
+                aria-describedby="unifiedModalTitle">
+          <span class="spinner-border spinner-border-sm d-none me-1"
+                id="unifiedModalSpinner"
+                role="status"
+                aria-hidden="true"></span>
+          <i class="bi bi-check-lg me-1" id="unifiedModalConfirmIcon" aria-hidden="true"></i>
+          <span id="unifiedModalConfirmText">Confirm</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>

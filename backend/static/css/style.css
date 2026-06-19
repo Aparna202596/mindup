@@ -1,44 +1,79 @@
-/* ══════════════════════════════════════════════════════
-  MindUp — style.css  (Bootstrap 5 base)
-   ══════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════════
+   MindUp — style.css  (Bootstrap 5 base)
+   Consolidated: no duplicates, CSS custom properties for all tokens.
+   ══════════════════════════════════════════════════════════════════════ */
 
-/* ── Design tokens ─────────────────────────────────── */
+/* ── Design tokens ────────────────────────────────────────────────── */
 :root {
-  --mu-primary:      #4f46e5;
-  --mu-primary-dark: #3730a3;
-  --mu-primary-light:#ede9fe;
-  --mu-surface:      #f8fafc;
-  --mu-border:       #e2e8f0;
-  --mu-text:         #1e293b;
-  --mu-text-muted:   #64748b;
-  --mu-success:      #10b981;
-  --mu-warning:      #f59e0b;
-  --mu-danger:       #ef4444;
-  --mu-info:         #3b82f6;
-  --mu-radius:       0.5rem;
-  --mu-radius-lg:    0.875rem;
-  --mu-shadow-sm:    0 1px 3px rgba(0,0,0,.08);
-  --mu-shadow:       0 4px 12px rgba(0,0,0,.08);
-  --mu-shadow-lg:    0 10px 30px rgba(0,0,0,.12);
-  --mu-transition:   0.18s ease;
+  /* Brand */
+  --mu-primary:       #4f46e5;
+  --mu-primary-dark:  #3730a3;
+  --mu-primary-light: #ede9fe;
+
+  /* Semantic */
+  --mu-success:  #10b981;
+  --mu-warning:  #f59e0b;
+  --mu-danger:   #ef4444;
+  --mu-info:     #3b82f6;
+
+  /* Surface */
+  --mu-surface:    #f8fafc;
+  --mu-border:     #e2e8f0;
+  --mu-text:       #1e293b;
+  --mu-text-muted: #64748b;
+
+  /* Shape */
+  --mu-radius:    0.5rem;
+  --mu-radius-lg: 0.875rem;
+
+  /* Elevation */
+  --mu-shadow-sm: 0 1px 3px rgba(0,0,0,.08);
+  --mu-shadow:    0 4px 12px rgba(0,0,0,.08);
+  --mu-shadow-lg: 0 10px 30px rgba(0,0,0,.12);
+
+  /* Motion */
+  --mu-transition: 0.18s ease;
 }
 
-/* ── Base ──────────────────────────────────────────── */
+/* ── Base ─────────────────────────────────────────────────────────── */
 body {
   color: var(--mu-text);
   font-size: 0.9375rem;
   line-height: 1.65;
 }
 
-a { color: var(--mu-primary); }
-a:hover { color: var(--mu-primary-dark); }
+a                   { color: var(--mu-primary); }
+a:hover             { color: var(--mu-primary-dark); }
 
-/* ── Navbar ─────────────────────────────────────────── */
+/* ── Global Loading Bar ───────────────────────────────────────────── */
+.global-loader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  pointer-events: none;
+}
+
+.global-loader-bar {
+  height: 3px;
+  background: linear-gradient(90deg, var(--mu-primary) 0%, #7c3aed 60%, var(--mu-info) 100%);
+  background-size: 200% 100%;
+  animation: loader-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes loader-slide {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Navbar ───────────────────────────────────────────────────────── */
 .navbar-mu {
   background: #fff;
   border-bottom: 1px solid var(--mu-border);
   box-shadow: var(--mu-shadow-sm);
 }
+
 .navbar-mu .nav-link {
   color: var(--mu-text-muted);
   font-weight: 500;
@@ -46,13 +81,18 @@ a:hover { color: var(--mu-primary-dark); }
   border-radius: var(--mu-radius);
   transition: color var(--mu-transition), background var(--mu-transition);
 }
+
 .navbar-mu .nav-link:hover,
 .navbar-mu .nav-link.active {
   color: var(--mu-primary);
   background: var(--mu-primary-light);
 }
 
-/* ── Stat cards ─────────────────────────────────────── */
+/* ── Cards (global overrides) ─────────────────────────────────────── */
+.card          { border-radius: var(--mu-radius-lg) !important; }
+.card-header   { border-radius: var(--mu-radius-lg) var(--mu-radius-lg) 0 0 !important; }
+
+/* ── Stat cards ───────────────────────────────────────────────────── */
 .stat-card {
   background: #fff;
   border: 1px solid var(--mu-border);
@@ -80,7 +120,7 @@ a:hover { color: var(--mu-primary-dark); }
   letter-spacing: 0.04em;
 }
 
-/* ── Question cards ─────────────────────────────────── */
+/* ── Question cards ───────────────────────────────────────────────── */
 .question-card {
   background: #fff;
   border: 1px solid var(--mu-border);
@@ -97,7 +137,24 @@ a:hover { color: var(--mu-primary-dark); }
   color: inherit;
 }
 
-/* ── Answer pre-wrap display ─────────────────────────── */
+/* ── Topic cards ──────────────────────────────────────────────────── */
+.topic-card {
+  border: 1px solid var(--mu-border) !important;
+  border-radius: var(--mu-radius-lg) !important;
+  transition: box-shadow var(--mu-transition), border-color var(--mu-transition), transform var(--mu-transition);
+}
+.topic-card:hover {
+  box-shadow: var(--mu-shadow) !important;
+  border-color: var(--mu-primary) !important;
+  transform: translateY(-2px);
+}
+
+/* ── Answer card ──────────────────────────────────────────────────── */
+.answer-card {
+  border-left: 4px solid var(--mu-primary) !important;
+}
+
+/* ── Answer pre-wrap ──────────────────────────────────────────────── */
 .answer-pre-wrap {
   white-space: pre-wrap;
   word-break: break-word;
@@ -111,7 +168,32 @@ a:hover { color: var(--mu-primary-dark); }
   color: var(--mu-text);
 }
 
-/* ── Badge status colours ────────────────────────────── */
+/* ── Question items (in detail views) ────────────────────────────── */
+.question-item {
+  transition: background var(--mu-transition);
+  border-radius: var(--mu-radius);
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+}
+.question-item:hover { background: var(--mu-surface); }
+
+/* ── Subcategory section ──────────────────────────────────────────── */
+.subcategory-section { transition: background var(--mu-transition); }
+.subcategory-section:hover { background: #fafbff; }
+
+/* ── Detail page icon ─────────────────────────────────────────────── */
+.detail-icon-wrap {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--mu-radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+/* ── Status badges ────────────────────────────────────────────────── */
 .badge-approved {
   background-color: #d1fae5;
   color: #065f46;
@@ -128,83 +210,35 @@ a:hover { color: var(--mu-primary-dark); }
   border: 1px solid #fca5a5;
 }
 
-/* ── Detail page icon ────────────────────────────────── */
-.detail-icon-wrap {
-  width: 52px;
-  height: 52px;
-  border-radius: var(--mu-radius-lg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  flex-shrink: 0;
-}
-
-/* ── Topic cards grid ────────────────────────────────── */
-.topic-card {
-  border: 1px solid var(--mu-border) !important;
-  border-radius: var(--mu-radius-lg) !important;
-  transition: box-shadow var(--mu-transition), border-color var(--mu-transition), transform var(--mu-transition);
-}
-.topic-card:hover {
-  box-shadow: var(--mu-shadow) !important;
-  border-color: var(--mu-primary) !important;
-  transform: translateY(-2px);
-}
-
-/* ── Answer card ─────────────────────────────────────── */
-.answer-card {
-  border-left: 4px solid var(--mu-primary) !important;
-}
-
-/* ── Question items in detail views ─────────────────── */
-.question-item {
-  transition: background var(--mu-transition);
-  border-radius: var(--mu-radius);
-  padding-left: 0.25rem;
-  padding-right: 0.25rem;
-}
-.question-item:hover {
-  background: #f8fafc;
-}
-
-/* ── Subcategory section separator ──────────────────── */
-.subcategory-section {
-  transition: background var(--mu-transition);
-}
-.subcategory-section:hover {
-  background: #fafbff;
-}
-
-/* ── Hero gradient ───────────────────────────────────── */
+/* ── Hero gradient ────────────────────────────────────────────────── */
 .hero-gradient {
   background: linear-gradient(135deg, var(--mu-primary) 0%, #7c3aed 100%);
 }
 
-/* ── Pagination ──────────────────────────────────────── */
-.pagination .page-link { color: var(--mu-primary); border-radius: 6px !important; margin: 0 2px; }
+/* ── Pagination ───────────────────────────────────────────────────── */
+.pagination .page-link {
+  color: var(--mu-primary);
+  border-radius: 6px !important;
+  margin: 0 2px;
+}
 .pagination .active .page-link {
   background-color: var(--mu-primary);
   border-color: var(--mu-primary);
 }
 
-/* ── Cards general ───────────────────────────────────── */
-.card { border-radius: var(--mu-radius-lg) !important; }
-.card-header { border-radius: var(--mu-radius-lg) var(--mu-radius-lg) 0 0 !important; }
-
-/* ── Form controls ───────────────────────────────────── */
+/* ── Form controls ────────────────────────────────────────────────── */
 .form-control:focus,
 .form-select:focus {
   border-color: var(--mu-primary);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+  box-shadow: 0 0 0 3px rgba(79,70,229,.15);
 }
 
-/* ── Bulk upload report ──────────────────────────────── */
-.report-card { border-left: 4px solid var(--mu-primary); }
+/* ── Bulk upload report cards ─────────────────────────────────────── */
+.report-card                { border-left: 4px solid var(--mu-primary); }
 .report-card.report-warning { border-left-color: var(--mu-warning); }
 .report-card.report-error   { border-left-color: var(--mu-danger); }
 
-/* ── Duplicate alert ─────────────────────────────────── */
+/* ── Duplicate alert ──────────────────────────────────────────────── */
 .duplicate-alert {
   border-left: 4px solid var(--mu-warning);
   background: #fffbeb;
@@ -212,44 +246,71 @@ a:hover { color: var(--mu-primary-dark); }
   padding: 1rem;
 }
 
-/* ── Toast container ─────────────────────────────────── */
-#toast-container { z-index: 9999; }
+/* ── Toast container ──────────────────────────────────────────────── */
+#toast-container       { z-index: 9999; }
 #toast-container .toast { min-width: 260px; }
 
-/* ── Letter spacing utility ──────────────────────────── */
+/* ── Utilities ────────────────────────────────────────────────────── */
 .letter-spacing-1 { letter-spacing: 0.06em; }
+.hover-bg:hover   { background: var(--mu-surface); }
+.opacity-60       { opacity: 0.6; }
 
-/* ── Responsive tables ───────────────────────────────── */
-.table-responsive { border-radius: 0 0 var(--mu-radius-lg) var(--mu-radius-lg); }
+/* ── Responsive table ─────────────────────────────────────────────── */
+.table-responsive {
+  border-radius: 0 0 var(--mu-radius-lg) var(--mu-radius-lg);
+}
 
-/* ── Scrollbar styling ───────────────────────────────── */
-.duplicate-list::-webkit-scrollbar { width: 4px; }
+/* ── Duplicate list scroll ────────────────────────────────────────── */
+.duplicate-list::-webkit-scrollbar       { width: 4px; }
 .duplicate-list::-webkit-scrollbar-track { background: #f1f5f9; }
 .duplicate-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
 
-/* ── Avatar ──────────────────────────────────────────── */
-.avatar-sm {
-  font-size: 0.875rem;
+/* ── Avatar ───────────────────────────────────────────────────────── */
+.avatar-sm { font-size: 0.875rem; }
+
+/* ── Admin badge in navbar ────────────────────────────────────────── */
+.admin-badge { font-size: 0.55rem; vertical-align: middle; }
+
+/* ── Button group ─────────────────────────────────────────────────── */
+.btn-group .btn          { border-radius: 6px !important; }
+.btn-group .btn + .btn   { margin-left: 2px; }
+
+/* ── Unified modal ────────────────────────────────────────────────── */
+#unifiedModal .modal-content {
+  border-radius: var(--mu-radius-lg);
 }
 
-/* ── Admin badge in navbar ───────────────────────────── */
-.admin-badge {
-  font-size: 0.55rem;
-  vertical-align: middle;
+/* ── Auto-dismiss alert transition ───────────────────────────────── */
+.auto-dismiss-alert {
+  transition: opacity 0.5s ease;
 }
 
-/* ── Btn group spacing ───────────────────────────────── */
-.btn-group .btn { border-radius: 6px !important; }
-.btn-group .btn + .btn { margin-left: 2px; }
-
-/* ── Mobile tweaks ───────────────────────────────────── */
+/* ── Mobile ───────────────────────────────────────────────────────── */
 @media (max-width: 576px) {
-  .stat-card .stat-number { font-size: 1.5rem; }
-  .detail-icon-wrap { width: 42px; height: 42px; font-size: 1.25rem; }
-  h1.h3 { font-size: 1.3rem; }
+  .stat-card .stat-number   { font-size: 1.5rem; }
+  .detail-icon-wrap          { width: 42px; height: 42px; font-size: 1.25rem; }
+  h1.h3                      { font-size: 1.3rem; }
+  .question-card             { padding: 0.75rem 1rem; }
 }
 
-/* ── Print ───────────────────────────────────────────── */
+/* ── Print ────────────────────────────────────────────────────────── */
 @media print {
-  .navbar, .btn, .modal, footer { display: none !important; }
+  .navbar, .btn, .modal, footer, #toast-container, .global-loader {
+    display: none !important;
+  }
+}
+
+/* ── unified_create.html — context preview card ───────────────────── */
+.uc-preview-card {
+  border-left: 4px solid var(--mu-border);
+  transition: border-color var(--mu-transition);
+}
+.uc-preview-card:hover {
+  border-left-color: var(--mu-primary);
+}
+.uc-preview-label {
+  width: 28px;
+  text-align: center;
+  font-size: 1.1rem;
+  padding-top: 0.1rem;
 }

@@ -1,0 +1,718 @@
+{% extends "base.html" %}
+{% block title %}
+  {% if question %}{{ question.title|truncatechars:60 }}
+  {% elif topic %}{{ topic.name }}
+  {% elif category %}{{ category.name }}
+  {% elif subcategory %}{{ subcategory.name }}
+  {% endif %} — MindUp
+{% endblock %}
+
+{% block content %}
+
+{# ─────────────────────────────────────────────────────────────────────────────
+   BREADCRUMB — adapts to topic / category / subcategory / question context
+   ───────────────────────────────────────────────────────────────────────── #}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb small">
+    <li class="breadcrumb-item"><a href="{% url 'topic-list' %}">Topics</a></li>
+
+    {% if question %}
+      <li class="breadcrumb-item">
+        <a href="{% url 'topic-detail' question.subcategory.category.topic.pk %}">
+          {{ question.subcategory.category.topic.name }}
+        </a>
+      </li>
+      <li class="breadcrumb-item">
+        <a href="{% url 'category-detail' question.subcategory.category.pk %}">
+          {{ question.subcategory.category.name }}
+        </a>
+      </li>
+      <li class="breadcrumb-item">
+        <a href="{% url 'subcategory-detail' question.subcategory.pk %}">
+          {{ question.subcategory.name }}
+        </a>
+      </li>
+      <li class="breadcrumb-item active" aria-current="page">Question</li>
+
+    {% elif category %}
+      <li class="breadcrumb-item">
+        <a href="{% url 'topic-detail' category.topic.pk %}">{{ category.topic.name }}</a>
+      </li>
+      <li class="breadcrumb-item active" aria-current="page">{{ category.name }}</li>
+
+    {% elif subcategory %}
+      <li class="breadcrumb-item">
+        <a href="{% url 'topic-detail' subcategory.category.topic.pk %}">
+          {{ subcategory.category.topic.name }}
+        </a>
+      </li>
+      <li class="breadcrumb-item">
+        <a href="{% url 'category-detail' subcategory.category.pk %}">
+          {{ subcategory.category.name }}
+        </a>
+      </li>
+      <li class="breadcrumb-item active" aria-current="page">{{ subcategory.name }}</li>
+
+    {% elif topic %}
+      <li class="breadcrumb-item active" aria-current="page">{{ topic.name }}</li>
+    {% endif %}
+  </ol>
+</nav>
+
+{# ─────────────────────────────────────────────────────────────────────────────
+   ██ QUESTION DETAIL VIEW
+   ───────────────────────────────────────────────────────────────────────── #}
+{% if question %}
+<div class="row g-4">
+  <div class="col-lg-8">
+
+    <!-- Question card -->
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-body p-4">
+        <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+          <h1 class="h4 fw-bold mb-0 flex-grow-1">{{ question.title }}</h1>
+          <div class="d-flex gap-1 flex-shrink-0">
+            {% if user.is_authenticated %}
+            <button class="btn btn-sm {% if question.pk in fav_q_ids %}btn-warning{% else %}btn-outline-warning{% endif %} fav-btn"
+                    data-content-type="question"
+                    data-object-id="{{ question.pk }}"
+                    title="Toggle favorite"
+                    aria-label="Toggle favorite for this question"
+                    aria-pressed="{% if question.pk in fav_q_ids %}true{% else %}false{% endif %}">
+              <i class="bi bi-star{% if question.pk in fav_q_ids %}-fill{% endif %}" aria-hidden="true"></i>
+            </button>
+            {% endif %}
+            {% if is_admin %}
+            <button class="btn btn-sm btn-outline-primary"
+                    data-crud-action="edit"
+                    data-crud-type="question"
+                    data-crud-id="{{ question.pk }}"
+                    aria-label="Edit question">
+              <i class="bi bi-pencil" aria-hidden="true"></i>
+            </button>
+            {% if question.is_hidden %}
+            <button class="btn btn-sm btn-outline-success ajax-unhide"
+                    data-type="question"
+                    data-id="{{ question.pk }}"
+                    data-name="{{ question.title|truncatechars:60 }}"
+                    aria-label="Unhide question">
+              <i class="bi bi-eye" aria-hidden="true"></i>
+            </button>
+            {% else %}
+            <button class="btn btn-sm btn-outline-warning ajax-hide"
+                    data-type="question"
+                    data-id="{{ question.pk }}"
+                    data-name="{{ question.title|truncatechars:60 }}"
+                    aria-label="Hide question">
+              <i class="bi bi-eye-slash" aria-hidden="true"></i>
+            </button>
+            {% endif %}
+            <button class="btn btn-sm btn-outline-danger ajax-delete"
+                    data-type="question"
+                    data-id="{{ question.pk }}"
+                    data-name="{{ question.title|truncatechars:60 }}"
+                    data-redirect="{% url 'question-list' %}"
+                    aria-label="Delete question">
+              <i class="bi bi-trash" aria-hidden="true"></i>
+            </button>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="d-flex gap-3 flex-wrap small text-muted">
+          <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">
+            {{ question.subcategory.category.topic.name }}
+          </span>
+          <span class="badge bg-secondary bg-opacity-10 text-secondary border">
+            {{ question.subcategory.name }}
+          </span>
+          <span><i class="bi bi-eye me-1" aria-hidden="true"></i>{{ question.view_count }} view{{ question.view_count|pluralize }}</span>
+          <span><i class="bi bi-chat me-1" aria-hidden="true"></i>{{ answers.count }} answer{{ answers.count|pluralize }}</span>
+          <span><i class="bi bi-clock me-1" aria-hidden="true"></i>{{ question.created_at|date:"M d, Y" }}</span>
+          {% if question.is_hidden %}
+          <span class="badge bg-secondary"><i class="bi bi-eye-slash me-1" aria-hidden="true"></i>Hidden</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Answers heading -->
+    <div class="mb-3 d-flex align-items-center justify-content-between">
+      <h2 class="h5 fw-bold mb-0">
+        <i class="bi bi-chat-text me-2 text-primary" aria-hidden="true"></i>
+        {{ answers.count }} Answer{{ answers.count|pluralize }}
+      </h2>
+      {% if user.is_authenticated %}
+      <a href="{% url 'answer-create' question.pk %}" class="btn btn-sm btn-primary">
+        <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Answer
+      </a>
+      {% endif %}
+    </div>
+
+    <!-- Answer list -->
+    {% if answers %}
+      {% for answer in answers %}
+      <article class="card border-0 shadow-sm mb-3 answer-card" id="answer-{{ answer.pk }}">
+        <div class="card-body p-4">
+          <div class="d-flex align-items-start justify-content-between gap-2 mb-3">
+            <div class="d-flex align-items-center gap-2">
+              <div class="avatar-sm bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center"
+                   style="width:36px;height:36px;flex-shrink:0;"
+                   aria-hidden="true">
+                <i class="bi bi-person-fill"></i>
+              </div>
+              <div>
+                <div class="fw-medium small">{{ answer.created_by.email|truncatechars:30 }}</div>
+                <time class="text-muted" style="font-size:0.75rem;"
+                      datetime="{{ answer.created_at|date:'Y-m-d' }}">
+                  {{ answer.created_at|date:"M d, Y" }}
+                </time>
+              </div>
+            </div>
+            {% if is_admin %}
+            <div class="d-flex gap-1">
+              <a href="{% url 'answer-edit' answer.pk %}"
+                 class="btn btn-sm btn-outline-primary"
+                 aria-label="Edit answer">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </a>
+              <button class="btn btn-sm btn-outline-danger ajax-delete"
+                      data-type="answer"
+                      data-id="{{ answer.pk }}"
+                      data-name="Answer #{{ answer.pk }}"
+                      data-delete-url="{% url 'answer-delete' answer.pk %}"
+                      aria-label="Delete answer">
+                <i class="bi bi-trash" aria-hidden="true"></i>
+              </button>
+            </div>
+            {% endif %}
+          </div>
+
+          <!-- Answer body — preserves whitespace/formatting -->
+          <div class="answer-content">
+            <pre class="answer-pre-wrap">{{ answer.content }}</pre>
+          </div>
+
+          <!-- Key points -->
+          {% if answer.points.all %}
+          <div class="mt-3 pt-3 border-top">
+            <div class="small fw-semibold text-muted mb-2">
+              <i class="bi bi-pin-angle me-1" aria-hidden="true"></i>Key Points
+            </div>
+            <ul class="list-unstyled mb-0">
+              {% for point in answer.points.all %}
+              <li class="d-flex gap-2 mb-1 small">
+                <i class="bi bi-check2-circle text-success flex-shrink-0 mt-1" aria-hidden="true"></i>
+                <span>{{ point.point }}</span>
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+
+          <div class="d-flex align-items-center gap-3 mt-3 pt-2 border-top small text-muted">
+            <span><i class="bi bi-hand-thumbs-up me-1" aria-hidden="true"></i>{{ answer.upvotes }}</span>
+            {% if user.is_authenticated %}
+            <a href="{% url 'answerpoint-create' answer.pk %}" class="text-muted text-decoration-none">
+              <i class="bi bi-pin-angle me-1" aria-hidden="true"></i>Add Key Point
+            </a>
+            {% endif %}
+          </div>
+        </div>
+      </article>
+      {% endfor %}
+
+    {% else %}
+      <div class="text-center py-5 text-muted">
+        <i class="bi bi-chat display-5 d-block mb-3" aria-hidden="true"></i>
+        <p>No answers yet. Be the first to answer!</p>
+        {% if user.is_authenticated %}
+        <a href="{% url 'answer-create' question.pk %}" class="btn btn-primary">
+          <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Write an Answer
+        </a>
+        {% endif %}
+      </div>
+    {% endif %}
+
+  </div><!-- /col-lg-8 -->
+
+  <!-- Sidebar -->
+  <aside class="col-lg-4">
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white fw-semibold border-bottom small">
+        <i class="bi bi-info-circle me-2 text-primary" aria-hidden="true"></i>About this Question
+      </div>
+      <div class="card-body small">
+        <dl class="mb-0">
+          <dt class="text-muted fw-normal">Topic</dt>
+          <dd class="mb-2">
+            <a href="{% url 'topic-detail' question.subcategory.category.topic.pk %}" class="text-decoration-none">
+              {{ question.subcategory.category.topic.name }}
+            </a>
+          </dd>
+          <dt class="text-muted fw-normal">Category</dt>
+          <dd class="mb-2">
+            <a href="{% url 'category-detail' question.subcategory.category.pk %}" class="text-decoration-none">
+              {{ question.subcategory.category.name }}
+            </a>
+          </dd>
+          <dt class="text-muted fw-normal">Subcategory</dt>
+          <dd class="mb-2">
+            <a href="{% url 'subcategory-detail' question.subcategory.pk %}" class="text-decoration-none">
+              {{ question.subcategory.name }}
+            </a>
+          </dd>
+          <dt class="text-muted fw-normal">Asked by</dt>
+          <dd class="mb-2">{{ question.created_by.email|truncatechars:25 }}</dd>
+          <dt class="text-muted fw-normal">Asked on</dt>
+          <dd class="mb-0">
+            <time datetime="{{ question.created_at|date:'Y-m-d' }}">
+              {{ question.created_at|date:"M d, Y" }}
+            </time>
+          </dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white fw-semibold border-bottom small">
+        <i class="bi bi-lightning me-2 text-warning" aria-hidden="true"></i>Quick Actions
+      </div>
+      <div class="card-body d-flex flex-column gap-2">
+        {% if user.is_authenticated %}
+        <a href="{% url 'answer-create' question.pk %}" class="btn btn-primary btn-sm">
+          <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Answer
+        </a>
+        {% endif %}
+        <a href="{% url 'subcategory-detail' question.subcategory.pk %}" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Back to Subcategory
+        </a>
+        <a href="{% url 'question-list' %}" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-list me-1" aria-hidden="true"></i>All Questions
+        </a>
+      </div>
+    </div>
+  </aside>
+</div><!-- /row -->
+
+{% else %}
+{# ─────────────────────────────────────────────────────────────────────────────
+   ██ TOPIC / CATEGORY / SUBCATEGORY DETAIL VIEW
+   ───────────────────────────────────────────────────────────────────────── #}
+{% with obj=topic|default:category|default:subcategory %}
+
+<!-- Page header -->
+<div class="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-3">
+  <div class="d-flex align-items-center gap-3">
+    <div class="detail-icon-wrap
+      {% if topic %}bg-primary bg-opacity-10 text-primary
+      {% elif category %}bg-info bg-opacity-10 text-info
+      {% else %}bg-secondary bg-opacity-10 text-secondary{% endif %}"
+      aria-hidden="true">
+      <i class="bi {% if topic %}bi-journals{% elif category %}bi-folder2{% else %}bi-folder-symlink{% endif %}"></i>
+    </div>
+    <div>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <h1 class="h3 fw-bold mb-0">
+          {% if topic %}{{ topic.name }}
+          {% elif category %}{{ category.name }}
+          {% else %}{{ subcategory.name }}{% endif %}
+        </h1>
+        {% if topic %}
+          <span class="badge badge-{{ topic.status }}">{{ topic.status|title }}</span>
+          {% if topic.is_hidden %}<span class="badge bg-secondary"><i class="bi bi-eye-slash me-1" aria-hidden="true"></i>Hidden</span>{% endif %}
+        {% elif category %}
+          <span class="badge badge-{{ category.status }}">{{ category.status|title }}</span>
+          {% if category.is_hidden %}<span class="badge bg-secondary"><i class="bi bi-eye-slash me-1" aria-hidden="true"></i>Hidden</span>{% endif %}
+        {% else %}
+          <span class="badge badge-{{ subcategory.status }}">{{ subcategory.status|title }}</span>
+          {% if subcategory.is_hidden %}<span class="badge bg-secondary"><i class="bi bi-eye-slash me-1" aria-hidden="true"></i>Hidden</span>{% endif %}
+        {% endif %}
+      </div>
+      {% if topic and topic.description %}
+        <p class="text-muted mb-0 mt-1">{{ topic.description }}</p>
+      {% elif category and category.description %}
+        <p class="text-muted mb-0 mt-1">{{ category.description }}</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="d-flex gap-2 flex-wrap">
+    <!-- Favorite -->
+    {% if user.is_authenticated %}
+    <button class="btn btn-sm
+        {% if topic %}{% if topic.pk in fav_topic_ids %}btn-warning{% else %}btn-outline-warning{% endif %}
+        {% elif category %}{% if category.pk in fav_cat_ids %}btn-warning{% else %}btn-outline-warning{% endif %}
+        {% else %}{% if subcategory.pk in fav_subcat_ids %}btn-warning{% else %}btn-outline-warning{% endif %}{% endif %}
+        fav-btn"
+      data-content-type="{% if topic %}topic{% elif category %}category{% else %}subcategory{% endif %}"
+      data-object-id="{% if topic %}{{ topic.pk }}{% elif category %}{{ category.pk }}{% else %}{{ subcategory.pk }}{% endif %}"
+      aria-label="Toggle Favorite"
+      aria-pressed="{% if topic %}{% if topic.pk in fav_topic_ids %}true{% else %}false{% endif %}{% elif category %}{% if category.pk in fav_cat_ids %}true{% else %}false{% endif %}{% else %}{% if subcategory.pk in fav_subcat_ids %}true{% else %}false{% endif %}{% endif %}">
+      <i class="bi bi-star
+        {% if topic %}{% if topic.pk in fav_topic_ids %}-fill{% endif %}
+        {% elif category %}{% if category.pk in fav_cat_ids %}-fill{% endif %}
+        {% else %}{% if subcategory.pk in fav_subcat_ids %}-fill{% endif %}{% endif %}"
+        aria-hidden="true"></i>
+      <span class="ms-1 d-none d-sm-inline">Favorite</span>
+    </button>
+    {% endif %}
+
+    {% if is_admin %}
+    <!-- Edit -->
+    <button class="btn btn-sm btn-outline-primary"
+            data-crud-action="edit"
+            data-crud-type="{% if topic %}topic{% elif category %}category{% else %}subcategory{% endif %}"
+            data-crud-id="{% if topic %}{{ topic.pk }}{% elif category %}{{ category.pk }}{% else %}{{ subcategory.pk }}{% endif %}"
+            aria-label="Edit">
+      <i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit
+    </button>
+    <!-- Hide / Unhide -->
+    {% if topic %}
+      {% if topic.is_hidden %}
+      <button class="btn btn-sm btn-outline-success ajax-unhide" data-type="topic" data-id="{{ topic.pk }}" data-name="{{ topic.name }}" aria-label="Unhide topic">
+        <i class="bi bi-eye me-1" aria-hidden="true"></i>Unhide
+      </button>
+      {% else %}
+      <button class="btn btn-sm btn-outline-warning ajax-hide" data-type="topic" data-id="{{ topic.pk }}" data-name="{{ topic.name }}" aria-label="Hide topic">
+        <i class="bi bi-eye-slash me-1" aria-hidden="true"></i>Hide
+      </button>
+      {% endif %}
+      <button class="btn btn-sm btn-outline-danger ajax-delete" data-type="topic" data-id="{{ topic.pk }}" data-name="{{ topic.name }}" aria-label="Delete topic">
+        <i class="bi bi-trash me-1" aria-hidden="true"></i>Delete
+      </button>
+    {% elif category %}
+      {% if category.is_hidden %}
+      <button class="btn btn-sm btn-outline-success ajax-unhide" data-type="category" data-id="{{ category.pk }}" data-name="{{ category.name }}" aria-label="Unhide category">
+        <i class="bi bi-eye me-1" aria-hidden="true"></i>Unhide
+      </button>
+      {% else %}
+      <button class="btn btn-sm btn-outline-warning ajax-hide" data-type="category" data-id="{{ category.pk }}" data-name="{{ category.name }}" aria-label="Hide category">
+        <i class="bi bi-eye-slash me-1" aria-hidden="true"></i>Hide
+      </button>
+      {% endif %}
+      <button class="btn btn-sm btn-outline-danger ajax-delete" data-type="category" data-id="{{ category.pk }}" data-name="{{ category.name }}" aria-label="Delete category">
+        <i class="bi bi-trash me-1" aria-hidden="true"></i>Delete
+      </button>
+    {% else %}
+      {% if subcategory.is_hidden %}
+      <button class="btn btn-sm btn-outline-success ajax-unhide" data-type="subcategory" data-id="{{ subcategory.pk }}" data-name="{{ subcategory.name }}" aria-label="Unhide subcategory">
+        <i class="bi bi-eye me-1" aria-hidden="true"></i>Unhide
+      </button>
+      {% else %}
+      <button class="btn btn-sm btn-outline-warning ajax-hide" data-type="subcategory" data-id="{{ subcategory.pk }}" data-name="{{ subcategory.name }}" aria-label="Hide subcategory">
+        <i class="bi bi-eye-slash me-1" aria-hidden="true"></i>Hide
+      </button>
+      {% endif %}
+      <button class="btn btn-sm btn-outline-danger ajax-delete" data-type="subcategory" data-id="{{ subcategory.pk }}" data-name="{{ subcategory.name }}" aria-label="Delete subcategory">
+        <i class="bi bi-trash me-1" aria-hidden="true"></i>Delete
+      </button>
+    {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+{# ── Topic view: categories → subcategories → questions ──────────────────── #}
+{% if topic %}
+  {% if categories %}
+    {% for cat in categories %}
+    <div class="card border-0 shadow-sm mb-4" id="cat-{{ cat.pk }}">
+      <div class="card-header bg-white d-flex align-items-center justify-content-between py-3 border-bottom">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-folder2-open text-info fs-5" aria-hidden="true"></i>
+          <a href="{% url 'category-detail' cat.pk %}" class="fw-semibold text-decoration-none text-dark">
+            {{ cat.name }}
+          </a>
+          {% if cat.is_hidden %}<span class="badge bg-secondary small"><i class="bi bi-eye-slash" aria-hidden="true"></i></span>{% endif %}
+          {% if user.is_authenticated %}
+          <button class="btn btn-link btn-sm p-0 fav-btn"
+                  data-content-type="category"
+                  data-object-id="{{ cat.pk }}"
+                  aria-label="Favorite {{ cat.name }}"
+                  aria-pressed="{% if cat.pk in fav_cat_ids %}true{% else %}false{% endif %}">
+            <i class="bi bi-star{% if cat.pk in fav_cat_ids %}-fill text-warning{% else %} text-muted{% endif %}" aria-hidden="true"></i>
+          </button>
+          {% endif %}
+        </div>
+        {% if is_admin %}
+        <div class="d-flex gap-1">
+          <button class="btn btn-outline-primary btn-sm" data-crud-action="edit" data-crud-type="category" data-crud-id="{{ cat.pk }}" aria-label="Edit {{ cat.name }}"><i class="bi bi-pencil" aria-hidden="true"></i></button>
+          {% if cat.is_hidden %}
+          <button class="btn btn-outline-success btn-sm ajax-unhide" data-type="category" data-id="{{ cat.pk }}" data-name="{{ cat.name }}" aria-label="Unhide {{ cat.name }}"><i class="bi bi-eye" aria-hidden="true"></i></button>
+          {% else %}
+          <button class="btn btn-outline-warning btn-sm ajax-hide" data-type="category" data-id="{{ cat.pk }}" data-name="{{ cat.name }}" aria-label="Hide {{ cat.name }}"><i class="bi bi-eye-slash" aria-hidden="true"></i></button>
+          {% endif %}
+          <button class="btn btn-outline-danger btn-sm ajax-delete" data-type="category" data-id="{{ cat.pk }}" data-name="{{ cat.name }}" aria-label="Delete {{ cat.name }}"><i class="bi bi-trash" aria-hidden="true"></i></button>
+        </div>
+        {% endif %}
+      </div>
+      <div class="card-body p-0">
+        {% for sub in cat.subcategories.all %}
+        {% if is_admin or not sub.is_hidden %}
+        <div class="subcategory-section border-bottom py-3 px-4" id="sub-{{ sub.pk }}">
+          <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-2">
+              <i class="bi bi-folder-symlink text-secondary" aria-hidden="true"></i>
+              <a href="{% url 'subcategory-detail' sub.pk %}" class="fw-medium text-decoration-none">
+                {{ sub.name }}
+              </a>
+              {% if sub.is_hidden %}<span class="badge bg-secondary small"><i class="bi bi-eye-slash" aria-hidden="true"></i></span>{% endif %}
+              {% if user.is_authenticated %}
+              <button class="btn btn-link btn-sm p-0 fav-btn"
+                      data-content-type="subcategory"
+                      data-object-id="{{ sub.pk }}"
+                      aria-label="Favorite {{ sub.name }}"
+                      aria-pressed="{% if sub.pk in fav_subcat_ids %}true{% else %}false{% endif %}">
+                <i class="bi bi-star{% if sub.pk in fav_subcat_ids %}-fill text-warning{% else %} text-muted{% endif %}" aria-hidden="true"></i>
+              </button>
+              {% endif %}
+            </div>
+            {% if is_admin %}
+            <div class="d-flex gap-1">
+              <button class="btn btn-outline-primary btn-sm" data-crud-action="edit" data-crud-type="subcategory" data-crud-id="{{ sub.pk }}" aria-label="Edit {{ sub.name }}"><i class="bi bi-pencil" aria-hidden="true"></i></button>
+              {% if sub.is_hidden %}
+              <button class="btn btn-outline-success btn-sm ajax-unhide" data-type="subcategory" data-id="{{ sub.pk }}" data-name="{{ sub.name }}" aria-label="Unhide {{ sub.name }}"><i class="bi bi-eye" aria-hidden="true"></i></button>
+              {% else %}
+              <button class="btn btn-outline-warning btn-sm ajax-hide" data-type="subcategory" data-id="{{ sub.pk }}" data-name="{{ sub.name }}" aria-label="Hide {{ sub.name }}"><i class="bi bi-eye-slash" aria-hidden="true"></i></button>
+              {% endif %}
+              <button class="btn btn-outline-danger btn-sm ajax-delete" data-type="subcategory" data-id="{{ sub.pk }}" data-name="{{ sub.name }}" aria-label="Delete {{ sub.name }}"><i class="bi bi-trash" aria-hidden="true"></i></button>
+            </div>
+            {% endif %}
+          </div>
+          <!-- Questions under subcategory -->
+          <div class="ms-4">
+            {% for q in sub.questions.all %}
+            {% if is_admin or not q.is_hidden %}
+            <div class="question-item d-flex align-items-start justify-content-between gap-2 py-2 border-bottom border-light" id="q-{{ q.pk }}">
+              <div class="flex-grow-1">
+                <a href="{% url 'question-detail' q.pk %}" class="text-decoration-none text-dark d-block">
+                  {{ q.title|truncatechars:120 }}
+                </a>
+                <div class="d-flex gap-3 mt-1 small text-muted">
+                  <span><i class="bi bi-chat me-1" aria-hidden="true"></i>{{ q.answers.count }}</span>
+                  <span><i class="bi bi-eye me-1" aria-hidden="true"></i>{{ q.view_count }}</span>
+                  {% if q.is_hidden %}<span class="text-secondary"><i class="bi bi-eye-slash me-1" aria-hidden="true"></i>Hidden</span>{% endif %}
+                </div>
+              </div>
+              <div class="d-flex gap-1 flex-shrink-0">
+                {% if user.is_authenticated %}
+                <button class="btn btn-link btn-sm p-1 fav-btn"
+                        data-content-type="question"
+                        data-object-id="{{ q.pk }}"
+                        aria-label="Favorite question"
+                        aria-pressed="{% if q.pk in fav_q_ids %}true{% else %}false{% endif %}">
+                  <i class="bi bi-star{% if q.pk in fav_q_ids %}-fill text-warning{% else %} text-muted{% endif %}" aria-hidden="true"></i>
+                </button>
+                {% endif %}
+                {% if is_admin %}
+                {% if q.is_hidden %}
+                <button class="btn btn-outline-success btn-sm ajax-unhide" data-type="question" data-id="{{ q.pk }}" data-name="{{ q.title|truncatechars:40 }}" aria-label="Unhide question"><i class="bi bi-eye" aria-hidden="true"></i></button>
+                {% else %}
+                <button class="btn btn-outline-warning btn-sm ajax-hide" data-type="question" data-id="{{ q.pk }}" data-name="{{ q.title|truncatechars:40 }}" aria-label="Hide question"><i class="bi bi-eye-slash" aria-hidden="true"></i></button>
+                {% endif %}
+                <button class="btn btn-outline-danger btn-sm ajax-delete" data-type="question" data-id="{{ q.pk }}" data-name="{{ q.title|truncatechars:40 }}" aria-label="Delete question"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                {% endif %}
+              </div>
+            </div>
+            {% endif %}
+            {% empty %}
+            <p class="text-muted small py-2 mb-0">No questions yet.</p>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+        {% empty %}
+        <p class="text-muted p-4 mb-0">No subcategories yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-folder2 display-5 d-block mb-3" aria-hidden="true"></i>
+      <p>No categories found{% if not is_admin %} with content{% endif %}.</p>
+      {% if is_admin %}
+      <button class="btn btn-primary" data-crud-action="create" data-crud-type="category">
+        <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add Category
+      </button>
+      {% endif %}
+    </div>
+  {% endif %}
+
+{# ── Category view: subcategories → questions ─────────────────────────────── #}
+{% elif category %}
+  {% if subcategories %}
+    {% for sub in subcategories %}
+    <div class="card border-0 shadow-sm mb-4" id="sub-{{ sub.pk }}">
+      <div class="card-header bg-white d-flex align-items-center justify-content-between py-3">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-folder-symlink text-secondary fs-5" aria-hidden="true"></i>
+          <a href="{% url 'subcategory-detail' sub.pk %}" class="fw-semibold text-decoration-none text-dark">
+            {{ sub.name }}
+          </a>
+          {% if sub.is_hidden %}<span class="badge bg-secondary small"><i class="bi bi-eye-slash" aria-hidden="true"></i></span>{% endif %}
+          {% if user.is_authenticated %}
+          <button class="btn btn-link btn-sm p-0 fav-btn"
+                  data-content-type="subcategory"
+                  data-object-id="{{ sub.pk }}"
+                  aria-label="Favorite {{ sub.name }}"
+                  aria-pressed="{% if sub.pk in fav_subcat_ids %}true{% else %}false{% endif %}">
+            <i class="bi bi-star{% if sub.pk in fav_subcat_ids %}-fill text-warning{% else %} text-muted{% endif %}" aria-hidden="true"></i>
+          </button>
+          {% endif %}
+        </div>
+        {% if is_admin %}
+        <div class="d-flex gap-1">
+          <button class="btn btn-outline-primary btn-sm" data-crud-action="edit" data-crud-type="subcategory" data-crud-id="{{ sub.pk }}" aria-label="Edit {{ sub.name }}"><i class="bi bi-pencil" aria-hidden="true"></i></button>
+          {% if sub.is_hidden %}
+          <button class="btn btn-outline-success btn-sm ajax-unhide" data-type="subcategory" data-id="{{ sub.pk }}" data-name="{{ sub.name }}" aria-label="Unhide {{ sub.name }}"><i class="bi bi-eye" aria-hidden="true"></i></button>
+          {% else %}
+          <button class="btn btn-outline-warning btn-sm ajax-hide" data-type="subcategory" data-id="{{ sub.pk }}" data-name="{{ sub.name }}" aria-label="Hide {{ sub.name }}"><i class="bi bi-eye-slash" aria-hidden="true"></i></button>
+          {% endif %}
+          <button class="btn btn-outline-danger btn-sm ajax-delete" data-type="subcategory" data-id="{{ sub.pk }}" data-name="{{ sub.name }}" aria-label="Delete {{ sub.name }}"><i class="bi bi-trash" aria-hidden="true"></i></button>
+        </div>
+        {% endif %}
+      </div>
+      <div class="card-body px-4 py-3">
+        {% for q in sub.questions.all %}
+        {% if is_admin or not q.is_hidden %}
+        <div class="question-item d-flex align-items-start justify-content-between gap-2 py-2 border-bottom border-light" id="q-{{ q.pk }}">
+          <div class="flex-grow-1">
+            <a href="{% url 'question-detail' q.pk %}" class="text-decoration-none text-dark">
+              {{ q.title|truncatechars:120 }}
+            </a>
+            <div class="d-flex gap-3 mt-1 small text-muted">
+              <span><i class="bi bi-chat me-1" aria-hidden="true"></i>{{ q.answers.count }}</span>
+              <span><i class="bi bi-eye me-1" aria-hidden="true"></i>{{ q.view_count }}</span>
+              {% if q.is_hidden %}<span class="text-secondary"><i class="bi bi-eye-slash me-1" aria-hidden="true"></i>Hidden</span>{% endif %}
+            </div>
+          </div>
+          <div class="d-flex gap-1 flex-shrink-0">
+            {% if user.is_authenticated %}
+            <button class="btn btn-link btn-sm p-1 fav-btn"
+                    data-content-type="question"
+                    data-object-id="{{ q.pk }}"
+                    aria-label="Favorite question"
+                    aria-pressed="{% if q.pk in fav_q_ids %}true{% else %}false{% endif %}">
+              <i class="bi bi-star{% if q.pk in fav_q_ids %}-fill text-warning{% else %} text-muted{% endif %}" aria-hidden="true"></i>
+            </button>
+            {% endif %}
+            {% if is_admin %}
+            {% if q.is_hidden %}
+            <button class="btn btn-outline-success btn-sm ajax-unhide" data-type="question" data-id="{{ q.pk }}" data-name="{{ q.title|truncatechars:40 }}" aria-label="Unhide question"><i class="bi bi-eye" aria-hidden="true"></i></button>
+            {% else %}
+            <button class="btn btn-outline-warning btn-sm ajax-hide" data-type="question" data-id="{{ q.pk }}" data-name="{{ q.title|truncatechars:40 }}" aria-label="Hide question"><i class="bi bi-eye-slash" aria-hidden="true"></i></button>
+            {% endif %}
+            <button class="btn btn-outline-danger btn-sm ajax-delete" data-type="question" data-id="{{ q.pk }}" data-name="{{ q.title|truncatechars:40 }}" aria-label="Delete question"><i class="bi bi-trash" aria-hidden="true"></i></button>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+        {% empty %}
+        <p class="text-muted small mb-0">No questions yet in this subcategory.</p>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-folder-symlink display-5 d-block mb-3" aria-hidden="true"></i>
+      <p>No subcategories found.</p>
+    </div>
+  {% endif %}
+
+{# ── Subcategory view: paginated question list ────────────────────────────── #}
+{% elif subcategory %}
+  <div class="mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <span class="text-muted small">
+      <i class="bi bi-question-circle me-1" aria-hidden="true"></i>
+      {{ page_obj.paginator.count }} question{{ page_obj.paginator.count|pluralize }}
+    </span>
+    {% if user.is_authenticated %}
+    <a href="{% url 'question-create' %}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Ask a Question
+    </a>
+    {% endif %}
+  </div>
+
+  {% if questions %}
+  <div class="d-flex flex-column gap-2">
+    {% for q in questions %}
+    {% if is_admin or not q.is_hidden %}
+    <div class="question-card" id="q-{{ q.pk }}">
+      <div class="d-flex align-items-start justify-content-between gap-2">
+        <div class="flex-grow-1">
+          <a href="{% url 'question-detail' q.pk %}" class="fw-semibold text-decoration-none text-dark d-block mb-1">
+            {{ q.title|truncatechars:140 }}
+          </a>
+          <div class="d-flex gap-3 small text-muted flex-wrap">
+            <span><i class="bi bi-chat me-1" aria-hidden="true"></i>{{ q.answers.count }} answer{{ q.answers.count|pluralize }}</span>
+            <span><i class="bi bi-eye me-1" aria-hidden="true"></i>{{ q.view_count }} view{{ q.view_count|pluralize }}</span>
+            <span><i class="bi bi-clock me-1" aria-hidden="true"></i>{{ q.created_at|date:"M d, Y" }}</span>
+            {% if q.is_hidden %}<span class="text-secondary"><i class="bi bi-eye-slash me-1" aria-hidden="true"></i>Hidden</span>{% endif %}
+          </div>
+        </div>
+        <div class="d-flex gap-1 flex-shrink-0">
+          {% if user.is_authenticated %}
+          <button class="btn btn-sm btn-link p-1 fav-btn"
+                  data-content-type="question"
+                  data-object-id="{{ q.pk }}"
+                  aria-label="Favorite question"
+                  aria-pressed="{% if q.pk in fav_q_ids %}true{% else %}false{% endif %}">
+            <i class="bi bi-star{% if q.pk in fav_q_ids %}-fill text-warning{% else %} text-muted{% endif %}" aria-hidden="true"></i>
+          </button>
+          {% endif %}
+          {% if is_admin %}
+          {% if q.is_hidden %}
+          <button class="btn btn-outline-success btn-sm ajax-unhide" data-type="question" data-id="{{ q.pk }}" data-name="{{ q.title|truncatechars:40 }}" aria-label="Unhide question"><i class="bi bi-eye" aria-hidden="true"></i></button>
+          {% else %}
+          <button class="btn btn-outline-warning btn-sm ajax-hide" data-type="question" data-id="{{ q.pk }}" data-name="{{ q.title|truncatechars:40 }}" aria-label="Hide question"><i class="bi bi-eye-slash" aria-hidden="true"></i></button>
+          {% endif %}
+          <button class="btn btn-outline-danger btn-sm ajax-delete" data-type="question" data-id="{{ q.pk }}" data-name="{{ q.title|truncatechars:40 }}" aria-label="Delete question"><i class="bi bi-trash" aria-hidden="true"></i></button>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+
+  {% if page_obj.has_other_pages %}
+  <nav class="mt-4" aria-label="Questions pagination">
+    <ul class="pagination pagination-sm justify-content-center">
+      {% if page_obj.has_previous %}
+      <li class="page-item">
+        <a class="page-link" href="?page={{ page_obj.previous_page_number }}" aria-label="Previous page">«</a>
+      </li>
+      {% endif %}
+      {% for num in page_obj.paginator.page_range %}
+      <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+        <a class="page-link" href="?page={{ num }}" {% if page_obj.number == num %}aria-current="page"{% endif %}>{{ num }}</a>
+      </li>
+      {% endfor %}
+      {% if page_obj.has_next %}
+      <li class="page-item">
+        <a class="page-link" href="?page={{ page_obj.next_page_number }}" aria-label="Next page">»</a>
+      </li>
+      {% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+
+  {% else %}
+  <div class="text-center py-5 text-muted">
+    <i class="bi bi-inbox display-5 d-block mb-3" aria-hidden="true"></i>
+    <p>No questions in this subcategory yet.</p>
+    {% if user.is_authenticated %}
+    <a href="{% url 'question-create' %}" class="btn btn-primary">
+      <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Ask the first question
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+{% endif %}{# end topic/category/subcategory branches #}
+{% endwith %}
+{% endif %}{# end question vs detail branch #}
+
+{% endblock %}

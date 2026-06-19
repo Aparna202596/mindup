@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+
+{# ── Page <title> ──────────────────────────────────────────────────────────── #}
+{% block title %}
+  {% if form_type == 'topic' %}Create Topic
+  {% elif form_type == 'category' %}Create Category
+  {% elif form_type == 'subcategory' %}Create Subcategory
+  {% elif form_type == 'question' %}Ask a Question
+  {% elif form_type == 'answer' %}Answer Question
+  {% elif form_type == 'answerpoint' %}Add Key Point
+  {% endif %} — MindUp
+{% endblock %}
+
+{% block content %}
+
+{# ══════════════════════════════════════════════════════════════════════════
+   BREADCRUMB — driven by form_type + optional parent context
+   ══════════════════════════════════════════════════════════════════════════ #}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb small">
+
+    {% if form_type == 'topic' %}
+      <li class="breadcrumb-item">
+        <a href="{% url 'topic-list' %}">Topics</a>
+      </li>
+      <li class="breadcrumb-item active" aria-current="page">New Topic</li>
+
+    {% elif form_type == 'category' %}
+      {% if preselected_topic %}
+        <li class="breadcrumb-item"><a href="{% url 'topic-list' %}">Topics</a></li>
+        <li class="breadcrumb-item">
+          <a href="{% url 'topic-detail' preselected_topic.pk %}">{{ preselected_topic.name }}</a>
+        </li>
+      {% else %}
+        <li class="breadcrumb-item"><a href="{% url 'category-list' %}">Categories</a></li>
+      {% endif %}
+      <li class="breadcrumb-item active" aria-current="page">New Category</li>
+
+    {% elif form_type == 'subcategory' %}
+      {% if preselected_category %}
+        <li class="breadcrumb-item"><a href="{% url 'topic-list' %}">Topics</a></li>
+        <li class="breadcrumb-item">
+          <a href="{% url 'topic-detail' preselected_category.topic.pk %}">
+            {{ preselected_category.topic.name }}
+          </a>
+        </li>
+        <li class="breadcrumb-item">
+          <a href="{% url 'category-detail' preselected_category.pk %}">
+            {{ preselected_category.name }}
+          </a>
+        </li>
+      {% else %}
+        <li class="breadcrumb-item"><a href="{% url 'category-list' %}">Categories</a></li>
+      {% endif %}
+      <li class="breadcrumb-item active" aria-current="page">New Subcategory</li>
+
+    {% elif form_type == 'question' %}
+      <li class="breadcrumb-item"><a href="{% url 'question-list' %}">Questions</a></li>
+      <li class="breadcrumb-item active" aria-current="page">New Question</li>
+
+    {% elif form_type == 'answer' %}
+      <li class="breadcrumb-item"><a href="{% url 'question-list' %}">Questions</a></li>
+      <li class="breadcrumb-item">
+        <a href="{% url 'question-detail' question.pk %}">
+          {{ question.title|truncatechars:60 }}
+        </a>
+      </li>
+      <li class="breadcrumb-item active" aria-current="page">Add Answer</li>
+
+    {% elif form_type == 'answerpoint' %}
+      <li class="breadcrumb-item"><a href="{% url 'question-list' %}">Questions</a></li>
+      <li class="breadcrumb-item">
+        <a href="{% url 'question-detail' answer.question.pk %}">
+          {{ answer.question.title|truncatechars:60 }}
+        </a>
+      </li>
+      <li class="breadcrumb-item active" aria-current="page">Add Key Point</li>
+    {% endif %}
+
+  </ol>
+</nav>
+
+{# ══════════════════════════════════════════════════════════════════════════
+   CONTEXT PREVIEW CARD
+   Shows the parent object for answer (question) and answerpoint (answer).
+   Not shown for topic / category / subcategory / question.
+   ══════════════════════════════════════════════════════════════════════════ #}
+{% if form_type == 'answer' %}
+<div class="card border-0 shadow-sm mb-4 uc-preview-card">
+  <div class="card-body d-flex gap-3 align-items-start">
+    <div class="uc-preview-label flex-shrink-0">
+      <i class="bi bi-question-circle text-primary" aria-hidden="true"></i>
+    </div>
+    <div class="flex-grow-1">
+      <div class="small text-muted fw-semibold mb-1 text-uppercase letter-spacing-1">Question</div>
+      <p class="mb-0 fw-semibold">{{ question.title }}</p>
+    </div>
+  </div>
+</div>
+
+{% elif form_type == 'answerpoint' %}
+<div class="card border-0 shadow-sm mb-4 uc-preview-card">
+  <div class="card-body d-flex gap-3 align-items-start">
+    <div class="uc-preview-label flex-shrink-0">
+      <i class="bi bi-chat-text text-success" aria-hidden="true"></i>
+    </div>
+    <div class="flex-grow-1">
+      <div class="small text-muted fw-semibold mb-1 text-uppercase letter-spacing-1">Answer</div>
+      <p class="mb-0 answer-pre-wrap small">{{ answer.content|truncatechars:300 }}</p>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ══════════════════════════════════════════════════════════════════════════
+   MAIN FORM CARD
+   Max-width varies per type; controlled by inline style (simplest approach
+   for 4 distinct values that only apply to this one card).
+   ══════════════════════════════════════════════════════════════════════════ #}
+<div class="card border-0 shadow-sm"
+     style="max-width:
+       {% if form_type == 'answer' %}760px
+       {% elif form_type == 'question' %}700px
+       {% elif form_type == 'answerpoint' %}600px
+       {% else %}640px{% endif %};">
+
+  <div class="card-body p-4">
+
+    {# ── Icon + Heading ─────────────────────────────────────────────────── #}
+    <div class="d-flex align-items-center gap-3 mb-3">
+
+      <div class="detail-icon-wrap
+        {% if form_type == 'topic' %}bg-primary bg-opacity-10 text-primary
+        {% elif form_type == 'category' %}bg-info bg-opacity-10 text-info
+        {% elif form_type == 'subcategory' %}bg-secondary bg-opacity-10 text-secondary
+        {% elif form_type == 'question' %}bg-primary bg-opacity-10 text-primary
+        {% elif form_type == 'answer' %}bg-success bg-opacity-10 text-success
+        {% elif form_type == 'answerpoint' %}bg-warning bg-opacity-10 text-warning
+        {% endif %}"
+        aria-hidden="true">
+        <i class="bi
+          {% if form_type == 'topic' %}bi-journal-plus
+          {% elif form_type == 'category' %}bi-folder-plus
+          {% elif form_type == 'subcategory' %}bi-folder-symlink
+          {% elif form_type == 'question' %}bi-question-circle
+          {% elif form_type == 'answer' %}bi-reply
+          {% elif form_type == 'answerpoint' %}bi-list-check
+          {% endif %}"></i>
+      </div>
+
+      <h1 class="h4 fw-bold mb-0">
+        {% if form_type == 'topic' %}Create Topic
+        {% elif form_type == 'category' %}Create Category
+        {% elif form_type == 'subcategory' %}Create Subcategory
+        {% elif form_type == 'question' %}Ask a Question
+        {% elif form_type == 'answer' %}Your Answer
+        {% elif form_type == 'answerpoint' %}Add a Key Point
+        {% endif %}
+      </h1>
+    </div>
+
+    {# ── Contextual description note ────────────────────────────────────── #}
+    {% if form_type == 'topic' %}
+    <p class="text-muted small mb-3">
+      New topics are submitted for admin approval and won't be visible to other users until approved.
+    </p>
+
+    {% elif form_type == 'category' %}
+    <p class="text-muted small mb-3">
+      {% if preselected_topic %}
+        Adding a category under <strong>{{ preselected_topic.name }}</strong>.
+      {% else %}
+        New categories are submitted for admin approval before they become visible to other users.
+      {% endif %}
+    </p>
+
+    {% elif form_type == 'subcategory' %}
+    <p class="text-muted small mb-3">
+      {% if preselected_category %}
+        Adding a subcategory under <strong>{{ preselected_category.name }}</strong>.
+      {% else %}
+        New subcategories are submitted for admin approval before they become visible to other users.
+      {% endif %}
+    </p>
+    {% endif %}
+
+    {# ── Duplicate warning (question only) ──────────────────────────────── #}
+    {% if form_type == 'question' and duplicates %}
+    <div class="alert alert-warning d-flex gap-2 rounded-3 mb-3" role="alert">
+      <i class="bi bi-exclamation-triangle-fill text-warning flex-shrink-0 mt-1" aria-hidden="true"></i>
+      <div>
+        <div class="fw-semibold mb-2">Similar questions already exist:</div>
+        <ul class="mb-0 small ps-3">
+          {% for d in duplicates %}
+          <li>
+            <a href="{% url 'question-detail' d.question.pk %}" class="fw-medium">
+              {{ d.question.title|truncatechars:120 }}
+            </a>
+            <span class="text-muted">&nbsp;({{ d.score }}% match)</span>
+          </li>
+          {% endfor %}
+        </ul>
+        <p class="small text-muted mt-2 mb-0">
+          <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+          Review these before submitting again — duplicate questions are not created.
+        </p>
+      </div>
+    </div>
+    {% endif %}
+
+    {# ── Form ───────────────────────────────────────────────────────────── #}
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {{ form|crispy }}
+
+      <div class="d-flex gap-2 mt-4 flex-wrap">
+
+        {# Submit button — icon and label vary by type #}
+        <button type="submit" class="btn btn-primary">
+          <i class="bi
+            {% if form_type == 'question' %}bi-send
+            {% elif form_type == 'answer' %}bi-check-lg
+            {% elif form_type == 'answerpoint' %}bi-pin-angle
+            {% else %}bi-check-lg
+            {% endif %} me-1"
+            aria-hidden="true"></i>
+          {% if form_type == 'topic' %}Submit Topic
+          {% elif form_type == 'category' %}Add Category
+          {% elif form_type == 'subcategory' %}Submit Subcategory
+          {% elif form_type == 'question' %}Post Question
+          {% elif form_type == 'answer' %}Post Answer
+          {% elif form_type == 'answerpoint' %}Add Key Point
+          {% endif %}
+        </button>
+
+        {# Cancel button — href varies by type and optional parent context #}
+        {% if form_type == 'topic' %}
+          <a href="{% url 'topic-list' %}" class="btn btn-outline-secondary">Cancel</a>
+
+        {% elif form_type == 'category' %}
+          {% if preselected_topic %}
+            <a href="{% url 'topic-detail' preselected_topic.pk %}" class="btn btn-outline-secondary">Cancel</a>
+          {% else %}
+            <a href="{% url 'category-list' %}" class="btn btn-outline-secondary">Cancel</a>
+          {% endif %}
+
+        {% elif form_type == 'subcategory' %}
+          {% if preselected_category %}
+            <a href="{% url 'category-detail' preselected_category.pk %}" class="btn btn-outline-secondary">Cancel</a>
+          {% else %}
+            <a href="{% url 'category-list' %}" class="btn btn-outline-secondary">Cancel</a>
+          {% endif %}
+
+        {% elif form_type == 'question' %}
+          <a href="{% url 'question-list' %}" class="btn btn-outline-secondary">Cancel</a>
+
+        {% elif form_type == 'answer' %}
+          <a href="{% url 'question-detail' question.pk %}" class="btn btn-outline-secondary">Cancel</a>
+
+        {% elif form_type == 'answerpoint' %}
+          <a href="{% url 'question-detail' answer.question.pk %}" class="btn btn-outline-secondary">Cancel</a>
+        {% endif %}
+
+      </div>
+    </form>
+
+  </div>{# /card-body #}
+</div>{# /card #}
+
+{% endblock %}
