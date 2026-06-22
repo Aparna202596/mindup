@@ -66,17 +66,6 @@
         <span class="fw-bold text-primary">MindUp</span>
         <span class="text-muted small">© {% now "Y" %}</span>
       </div>
-      <nav aria-label="Footer navigation">
-        <div class="d-flex gap-4 flex-wrap">
-          <a href="{% url 'topic-list' %}"    class="text-muted text-decoration-none small">Topics</a>
-          <a href="{% url 'question-list' %}" class="text-muted text-decoration-none small">Questions</a>
-          <a href="{% url 'search' %}"        class="text-muted text-decoration-none small">Search</a>
-          {% if user.is_authenticated %}
-            <a href="{% url 'favorites' %}"      class="text-muted text-decoration-none small">Favorites</a>
-            <a href="{% url 'bulk-qa-upload' %}" class="text-muted text-decoration-none small">Bulk Upload</a>
-          {% endif %}
-        </div>
-      </nav>
     </div>
   </footer>
 

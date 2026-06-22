@@ -23,8 +23,9 @@ def custom_admin_login(request, *args, **kwargs):
 urlpatterns = [
     path("admin/login/", custom_admin_login),
     path("admin/", admin.site.urls),
+
+    path("accounts/", include("allauth.urls")), 
     
-    path("accounts/", include("allauth.urls")),
     path("", include("apps.core.urls")),
     path("", include("apps.dashboard.urls")),
 ]

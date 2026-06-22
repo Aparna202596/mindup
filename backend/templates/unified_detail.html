@@ -9,9 +9,6 @@
 
 {% block content %}
 
-{# ─────────────────────────────────────────────────────────────────────────────
-   BREADCRUMB — adapts to topic / category / subcategory / question context
-   ───────────────────────────────────────────────────────────────────────── #}
 <nav aria-label="breadcrumb" class="mb-3">
   <ol class="breadcrumb small">
     <li class="breadcrumb-item"><a href="{% url 'topic-list' %}">Topics</a></li>
@@ -59,9 +56,6 @@
   </ol>
 </nav>
 
-{# ─────────────────────────────────────────────────────────────────────────────
-   ██ QUESTION DETAIL VIEW
-   ───────────────────────────────────────────────────────────────────────── #}
 {% if question %}
 <div class="row g-4">
   <div class="col-lg-8">
@@ -262,8 +256,8 @@
               {{ question.subcategory.name }}
             </a>
           </dd>
-          <dt class="text-muted fw-normal">Asked by</dt>
-          <dd class="mb-2">{{ question.created_by.email|truncatechars:25 }}</dd>
+          {% comment %} <dt class="text-muted fw-normal">Asked by</dt>
+          <dd class="mb-2">{{ question.created_by.email|truncatechars:25 }}</dd> {% endcomment %}
           <dt class="text-muted fw-normal">Asked on</dt>
           <dd class="mb-0">
             <time datetime="{{ question.created_at|date:'Y-m-d' }}">
@@ -296,9 +290,7 @@
 </div><!-- /row -->
 
 {% else %}
-{# ─────────────────────────────────────────────────────────────────────────────
-   ██ TOPIC / CATEGORY / SUBCATEGORY DETAIL VIEW
-   ───────────────────────────────────────────────────────────────────────── #}
+
 {% with obj=topic|default:category|default:subcategory %}
 
 <!-- Page header -->

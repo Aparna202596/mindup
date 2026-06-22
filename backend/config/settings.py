@@ -28,7 +28,11 @@ ALLOWED_HOSTS = []
 # 3. APPLICATION DEFINITIONS (Django, Third-Party, Local)
 # ==============================================================================
 INSTALLED_APPS = [
-    # Core Django Apps
+    # 1. Local Project Apps 
+    'apps.core',
+    'apps.dashboard',
+
+    # 2. Core Django Apps
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -38,21 +42,17 @@ INSTALLED_APPS = [
     'django.contrib.postgres',
     'django.contrib.sites',  
 
-    # Third-Party Frameworks & Utilities
+    # 3. Third-Party Frameworks & Utilities
     'rest_framework',
     'django_filters',
     'crispy_forms',
     'crispy_bootstrap5',
 
-    # Authentication (django-allauth)
+    # 4. Authentication (django-allauth)
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google',
-
-    # Local Project Apps
-    'apps.core',
-    'apps.dashboard',
 ]
 
 
@@ -133,18 +133,15 @@ AUTH_PASSWORD_VALIDATORS = [
 # ==============================================================================
 SITE_ID = 2
 
-# Resolved warning conflicts: using email as the primary identification method
-ACCOUNT_LOGIN_METHODS = {"email"}
-ACCOUNT_SIGNUP_FIELDS = ["email*"]  # Only require email for signup
-# Disable username field and make email the unique identifier
+ACCOUNT_LOGIN_METHODS    = {"email"}
+ACCOUNT_SIGNUP_FIELDS    = ["email*"]
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
-# Registration adjustments
 ACCOUNT_EMAIL_VERIFICATION = "none"
 SOCIALACCOUNT_LOGIN_ON_GET = True
 
-# Override admin login template
-LOGIN_REDIRECT_URL = "smart-login-redirect"  
-LOGOUT_REDIRECT_URL = "/accounts/login/"
+ACCOUNT_LOGIN_URL    = "accounts/login/"
+LOGIN_REDIRECT_URL   = "smart-login-redirect"
+LOGOUT_REDIRECT_URL  = "/accounts/login/"
 # ==============================================================================
 # 9. INTERNATIONALIZATION & LOCALIZATION
 # ==============================================================================

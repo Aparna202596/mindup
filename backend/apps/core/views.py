@@ -251,8 +251,10 @@ def topic_detail_view(request, pk):
     fav_subcat_ids = _user_favorite_ids(request.user, "subcategory")
     fav_q_ids      = _user_favorite_ids(request.user, "question")
 
-    return render(request, "detail_unified.html", {
+    return render(request, "unified_detail.html", {
         "topic":         topic,
+        "category":      None,  
+        "subcategory":   None,
         "categories":    categories,
         "is_admin":      is_admin,
         "fav_topic_ids":  fav_topic_ids,
@@ -412,8 +414,10 @@ def category_detail_view(request, pk):
     fav_subcat_ids = _user_favorite_ids(request.user, "subcategory")
     fav_q_ids      = _user_favorite_ids(request.user, "question")
 
-    return render(request, "detail_unified.html", {
+    return render(request, "unified_detail.html", {
+        "topic":         None,
         "category":      category,
+        "subcategory":   None,
         "subcategories": subcategories,
         "is_admin":      is_admin,
         "fav_cat_ids":   fav_cat_ids,
@@ -548,7 +552,9 @@ def subcategory_detail_view(request, pk):
     page_obj  = paginator.get_page(request.GET.get("page", 1))
     fav_q_ids = _user_favorite_ids(request.user, "question")
 
-    return render(request, "detail_unified.html", {
+    return render(request, "unified_detail.html", {
+        "topic":       None,     
+        "category":    sub.category,
         "subcategory": sub,
         "questions":   page_obj,
         "page_obj":    page_obj,
@@ -861,7 +867,7 @@ def question_create_view(request):
     })
 
 
-@user_login_required("core.bulk_upload_question")
+@user_login_required()
 def bulk_qa_upload(request):
     form   = BulkQAUploadForm(request.POST or None)
     report = None
